@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      target: development
+    container_name: dex_sniper-dev-app
+    volumes:
+      - ./:/usr/app
+      - /usr/app/node_modules
+    entrypoint: ['/bin/sh', '-c', '/usr/app/entrypoint.sh']
+
+  db:
+    container_name: dex_sniper-dev-db
+    volumes:
+      - dex_sniper_pg_DEV_data:/var/lib/postgresql/data
+
+volumes:
+  dex_sniper_pg_DEV_data:
