@@ -51,7 +51,7 @@ services:
       - dex_network
 
   redis:
-    image: redis:alpine
+    image: redis:7.4.2-alpine
     container_name: dex_sniper-redis
     restart: always
     ports:

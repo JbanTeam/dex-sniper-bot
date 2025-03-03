@@ -18,6 +18,7 @@ async function start() {
 
   await app.listen(PORT);
 }
+
 start()
   .then(() => console.log(`Server started on ${PORT}`))
   .catch(console.error);

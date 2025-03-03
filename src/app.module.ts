@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
-import { AuthModule } from './modules/auth/auth.module';
-import { UserModule } from './modules/user/user.module';
 import { databaseConfig } from './config/database.config';
+import { UserModule } from './modules/user/user.module';
+import { TelegramModule } from './modules/bot-providers/telegram/telegram.module';
+import { RedisModule } from './modules/redis/redis.module';
 
 const envPath =
   process.env.NODE_ENV === 'development' ? '.env.dev' : process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
@@ -19,8 +20,9 @@ const envPath =
         return databaseConfig(configService);
       },
     }),
-    AuthModule,
     UserModule,
+    TelegramModule,
+    RedisModule,
   ],
 })
 export class AppModule {}
