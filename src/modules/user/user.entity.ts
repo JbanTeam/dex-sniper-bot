@@ -1,25 +1,35 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { IsNumber, ValidateNested } from 'class-validator';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
 
-@Entity('user')
-export class UserEntity {
+import { UserToken } from './user-token.entity';
+import { Wallet } from '@modules/wallet/wallet.entity';
+import { Subscription } from '@modules/subscription/subscription.entity';
+
+@Entity()
+export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  name: string;
+  @Column({ unique: true })
+  @IsNumber()
+  chatId: number;
 
   @Column({ unique: true })
-  email: string;
-
-  @Column()
-  password: string;
+  @IsNumber()
+  telegramUserId: number;
 
   @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+  @OneToMany(() => UserToken, token => token.user)
+  @ValidateNested({ each: true })
+  tokens: UserToken[];
 
-  @Column({ type: 'varchar', nullable: true })
-  refreshToken: string | null;
+  @OneToMany(() => Subscription, subscription => subscription.user)
+  @ValidateNested({ each: true })
+  subscriptions: Subscription[];
+
+  @OneToMany(() => Wallet, wallet => wallet.user)
+  @ValidateNested({ each: true })
+  wallets: Wallet[];
 }
