@@ -15,14 +15,14 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - dex_sniper_pg_TEST_data:/var/lib/postgresql/data
+      - pg_TEST_data:/var/lib/postgresql/data
     ports:
       - ${DB_PORT}:5432
     networks:
-      - dex_sniper_TEST_db_network
+      - TEST_db_network
 
 volumes:
-  dex_sniper_pg_TEST_data:
+  pg_TEST_data:
 networks:
-  dex_sniper_TEST_db_network:
+  TEST_db_network:
     driver: bridge
