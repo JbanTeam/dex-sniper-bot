@@ -61,9 +61,14 @@ export class TelegramService implements OnModuleInit {
         telegramUserId: ctx.from.id,
       });
 
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
       ctx.session.userId = user.id;
       ctx.session.chatId = ctx.chat.id;
       ctx.session.telegramUserId = ctx.from.id;
+      ctx.session.wallets = [...user.wallets];
 
       ctx.state = { action };
 
@@ -81,7 +86,14 @@ export class TelegramService implements OnModuleInit {
       }
 
       await ctx.reply(startMessage, { parse_mode: 'HTML' });
-      await ctx.reply(`Вы были успешно зарегистрированы!`, { parse_mode: 'HTML' });
+
+      const walletMessages = ctx.session.wallets?.map(wallet => {
+        return `<b>${wallet.network}</b> - <code>${wallet.address}</code>`;
+      });
+
+      const registrationMessge = `<b>Вы были успешно зарегистрированы!</b>\n\n<b>Ваши кошельки:</b>\n${walletMessages?.join('\n')}`;
+
+      await ctx.reply(registrationMessge, { parse_mode: 'HTML' });
     });
   }
 
@@ -101,7 +113,7 @@ export class TelegramService implements OnModuleInit {
       return await this.sendMessage(ctx.session.chatId, message);
     }
 
-    const user = await this.userService.findById(userId);
+    const user = await this.userService.findById({ id: userId });
     if (!user) {
       throw new NotFoundException('User not found');
     }

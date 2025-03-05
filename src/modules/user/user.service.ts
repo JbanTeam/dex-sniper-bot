@@ -1,38 +1,58 @@
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { User } from './user.entity';
 import { RegisterDto } from './dto/register.dto';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { Network } from '@src/types/types';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly blockchainService: BlockchainService,
   ) {}
 
-  async getOrCreateUser({ chatId, telegramUserId }: RegisterDto): Promise<{ action: string; user: User }> {
+  async getOrCreateUser({ chatId, telegramUserId }: RegisterDto): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
-    let user = await this.userRepository.findOne({
-      where: { chatId },
-    });
+    let user = await this.findById({ chatId });
 
     if (!user) {
-      user = this.userRepository.create({
-        chatId,
-        telegramUserId,
+      user = await this.userRepository.manager.transaction(async entityManager => {
+        const createdUser = entityManager.create(User, {
+          chatId,
+          telegramUserId,
+        });
+
+        const savedUser = await entityManager.save(createdUser);
+
+        await this.blockchainService.createWallet({
+          userId: savedUser.id,
+          network: Network.BSC,
+          entityManager,
+        });
+
+        await this.blockchainService.createWallet({
+          userId: savedUser.id,
+          network: Network.POLYGON,
+          entityManager,
+        });
+
+        return this.findById({ id: savedUser.id }, entityManager);
       });
-      await this.userRepository.save(user);
       action = 'create';
     }
 
     return { action, user };
   }
 
-  async findById(id: number): Promise<User | null> {
-    return this.userRepository.findOne({
-      where: { id },
+  async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
+    const manager = entityManager || this.userRepository.manager;
+    const user = await manager.findOne(User, {
+      where: { ...where },
+      relations: ['wallets'],
       select: {
         id: true,
         createdAt: true,
@@ -40,5 +60,7 @@ export class UserService {
         telegramUserId: true,
       },
     });
+
+    return user;
   }
 }

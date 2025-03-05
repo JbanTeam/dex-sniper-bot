@@ -1,5 +1,7 @@
 import { Context, SessionFlavor } from 'grammy';
 
+import { Wallet } from '@modules/wallet/wallet.entity';
+
 type CustomState = {
   state: {
     action: string;
@@ -20,4 +22,5 @@ export interface SessionData {
   userId?: number;
   chatId?: number;
   telegramUserId?: number;
+  wallets?: Wallet[];
 }
