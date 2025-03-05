@@ -1,12 +1,12 @@
+import { Address } from 'viem';
+import { ConfigService } from '@nestjs/config';
 import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
-import { Bot, session } from 'grammy';
+import { Bot, GrammyError, HttpError, InlineKeyboard, session } from 'grammy';
+
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
-import { ConfigService } from '@nestjs/config';
-import { startMessage } from '@src/utils/constants';
-import { BotContext, SessionData } from '@src/types/types';
-// import { BlockchainService } from '../blockchain/blockchain.service';
-// import { SubscriptionService } from '../subscription/subscription.service';
+import { chains, startMessage } from '@src/utils/constants';
+import { BotContext, Network, SessionData } from '@src/types/types';
 
 @Injectable()
 export class TelegramService implements OnModuleInit {
@@ -16,14 +16,13 @@ export class TelegramService implements OnModuleInit {
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
-
-    // private readonly blockchainService: BlockchainService,
-    // private readonly subscriptionService: SubscriptionService,
   ) {
     this.bot = new Bot<BotContext>(this.configService.get<string>('TELEGRAM_BOT_TOKEN', ''));
+    this.setCommands();
     this.setupSession();
     this.registerMiddlewares();
     this.registerCommands();
+    this.addEventListeners();
     this.registerErrorHandler();
   }
 
@@ -76,6 +75,19 @@ export class TelegramService implements OnModuleInit {
     });
   }
 
+  private setCommands() {
+    this.bot.api
+      .setMyCommands([
+        { command: '/start', description: 'Приветствие, функциональность' },
+        { command: '/help', description: 'Помощь' },
+        { command: '/addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
+        { command: '/removetoken', description: 'Добавить токен, /removetoken [адрес_токена]' },
+        { command: '/balance', description: 'Посмотреть баланс' },
+        { command: '/my_subscribes', description: 'Посмотреть мои подписки' },
+      ])
+      .catch(console.error);
+  }
+
   private registerCommands() {
     this.bot.command('start', async ctx => {
       const { action } = ctx.state;
@@ -95,28 +107,90 @@ export class TelegramService implements OnModuleInit {
 
       await ctx.reply(registrationMessge, { parse_mode: 'HTML' });
     });
+    this.bot.command('addtoken', async ctx => {
+      if (!ctx.message || !ctx.session.userId) return;
+
+      const [, tokenAddress] = ctx.message.text.split(' ');
+      if (!tokenAddress) {
+        await ctx.reply('Введите адрес токена. Пример: /addtoken [адрес_токена]');
+        return;
+      }
+
+      ctx.session.tempToken = tokenAddress;
+
+      const keyboard = new InlineKeyboard();
+      const chainsArr = Object.entries(chains(this.configService));
+      chainsArr.forEach(([keyNetwork, value]) => {
+        keyboard.text(value.name, `net-${keyNetwork}`);
+      });
+
+      await ctx.reply('Выберите сеть, в которой находится ваш токен', { reply_markup: keyboard });
+    });
   }
 
   private registerErrorHandler() {
     this.bot.catch(err => {
-      console.log(err.error);
-      console.error(`Telegram error: ${err.message}`);
+      const ctx = err.ctx;
+      console.error(`Error while handling update ${ctx.update.update_id}:`);
+      const e = err.error;
+      if (e instanceof GrammyError) {
+        console.error('Error in request:', e.description);
+      } else if (e instanceof HttpError) {
+        console.error('Could not contact Telegram:', e);
+      } else {
+        console.error('Unknown error:', e);
+      }
     });
   }
 
-  async sendMessage(chatId: number, message: string) {
+  async sendMessage({ chatId, message }: { chatId: number; message: string }) {
     await this.bot.api.sendMessage(chatId, message);
   }
 
   async notifyUser({ userId, message, ctx }: { userId: number; message: string; ctx: BotContext }) {
     if (ctx.session.chatId) {
-      return await this.sendMessage(ctx.session.chatId, message);
+      return await this.sendMessage({ chatId: ctx.session.chatId, message });
     }
 
     const user = await this.userService.findById({ id: userId });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.sendMessage(user.chatId, message);
+    await this.sendMessage({ chatId: user.chatId, message });
+  }
+
+  private addEventListeners() {
+    this.bot.callbackQuery(/^net-(.+)/, async ctx => {
+      await this.networkKeyboardCb(ctx);
+    });
+  }
+
+  private async networkKeyboardCb(ctx: BotContext) {
+    if (!ctx.match || !ctx.session.tempToken || !ctx.session.userId) return;
+    const network = ctx.match[1] as Network;
+    const tokenAddress = ctx.session.tempToken;
+    const userId = ctx.session.userId;
+
+    try {
+      const tokens = await this.userService.addToken({
+        userId,
+        address: tokenAddress as Address,
+        network: network,
+      });
+
+      delete ctx.session.tempToken;
+
+      let reply = `Токен успешно добавлен 🔥🔥🔥\n\n<u>Ваши токены:</u>\n`;
+
+      tokens.forEach((token, index) => {
+        reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
+      });
+
+      await ctx.deleteMessage();
+      await ctx.reply(reply, { parse_mode: 'HTML' });
+    } catch (error) {
+      await ctx.deleteMessage();
+      await ctx.reply(`${error.message}`);
+    }
   }
 }

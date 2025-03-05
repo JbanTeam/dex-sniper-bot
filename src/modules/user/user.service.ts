@@ -1,17 +1,21 @@
 import { EntityManager, Repository } from 'typeorm';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { User } from './user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { Network } from '@src/types/types';
+import { UserToken } from './user-token.entity';
+import { Address } from 'viem';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(UserToken)
+    private readonly userTokenRepository: Repository<UserToken>,
     private readonly blockchainService: BlockchainService,
   ) {}
 
@@ -48,11 +52,53 @@ export class UserService {
     return { action, user };
   }
 
+  async addToken({
+    userId,
+    address,
+    network,
+  }: {
+    userId: number;
+    address: Address;
+    network: Network;
+  }): Promise<UserToken[]> {
+    const user = await this.findById({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.tokens.some(t => t.address === address && t.network === network)) {
+      throw new Error('Токен уже добавлен');
+    }
+
+    const networkTokens = user.tokens.filter(t => t.network === network);
+    if (networkTokens.length >= 5) {
+      throw new Error('Максимум можно добавить 5 токенов на одну сеть');
+    }
+
+    const { name, symbol, decimals } = await this.blockchainService.checkToken({ address, network });
+
+    const token = this.userTokenRepository.create({
+      address,
+      network,
+      user,
+      name,
+      symbol,
+      decimals,
+    });
+
+    await this.userTokenRepository.save(token);
+
+    const tokens = [...user.tokens, token];
+
+    return tokens;
+  }
+
   async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
     const manager = entityManager || this.userRepository.manager;
     const user = await manager.findOne(User, {
       where: { ...where },
-      relations: ['wallets'],
+      relations: ['wallets', 'tokens'],
       select: {
         id: true,
         createdAt: true,

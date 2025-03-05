@@ -1,3 +1,7 @@
+import { ConfigService } from '@nestjs/config';
+import { Network } from '@src/types/types';
+import { bsc, polygon } from 'viem/chains';
+
 export const startMessage = `
 <strong>Добро пожаловать в DexSniperMegaBot!</strong> 🔥🔥🔥
 
@@ -14,6 +18,21 @@ export const startMessage = `
 
 Используйте команду /help, чтобы увидеть список команд.
 `;
+
+export const chains = (configService: ConfigService) => {
+  return {
+    [Network.BSC]: {
+      name: 'Binance Smart Chain',
+      rpcUrl: configService.get<string>('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/'),
+      chain: bsc,
+    },
+    [Network.POLYGON]: {
+      name: 'Polygon',
+      rpcUrl: configService.get<string>('POLYGON_RPC_URL', 'https://polygon-rpc.com/'),
+      chain: polygon,
+    },
+  };
+};
 
 const httpStatusMap = new Map([
   [100, 'Continue'],

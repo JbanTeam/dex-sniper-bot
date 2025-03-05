@@ -1,4 +1,5 @@
 import { Context, SessionFlavor } from 'grammy';
+import { PublicClient, WalletClient } from 'viem';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
 
@@ -24,3 +25,12 @@ export interface SessionData {
   telegramUserId?: number;
   wallets?: Wallet[];
 }
+
+export type ViemClientsType = {
+  public: {
+    [key in Network]: PublicClient;
+  };
+  wallet: {
+    [key in Network]: WalletClient;
+  };
+};

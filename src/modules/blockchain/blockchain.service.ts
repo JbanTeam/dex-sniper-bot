@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { EntityManager } from 'typeorm';
+import { Address } from 'viem';
 
 import { ViemProvider } from './viem/viem.provider';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { Network } from '@src/types/types';
-import { EntityManager } from 'typeorm';
 
 @Injectable()
 export class BlockchainService {
@@ -29,6 +30,16 @@ export class BlockchainService {
       entityManager,
     });
     return savedWallet;
+  }
+
+  async checkToken({
+    address,
+    network,
+  }: {
+    address: Address;
+    network: Network;
+  }): Promise<{ name: string; symbol: string; decimals: number }> {
+    return this.viemProvider.checkToken({ address, network });
   }
 
   // async getBalance(address: string, network: Network): Promise<string> {

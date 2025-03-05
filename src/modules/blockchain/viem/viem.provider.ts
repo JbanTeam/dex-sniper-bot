@@ -1,25 +1,26 @@
-import * as crypto from 'crypto';
 import { Injectable } from '@nestjs/common';
+import { isEthereumAddress } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
-import { createWalletClient, http } from 'viem';
-import { polygon, bsc } from 'viem/chains';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { Network } from '@src/types/types';
+import { createWalletClient, createPublicClient, http, parseAbi, Address, ContractFunctionExecutionError } from 'viem';
+
+import { chains } from '@src/utils/constants';
+import { encryptPrivateKey } from '@src/utils/crypto';
+import { Network, ViemClientsType } from '@src/types/types';
 
 @Injectable()
 export class ViemProvider {
-  private clients = {
-    [Network.BSC]: createWalletClient({
-      chain: bsc,
-      transport: http(process.env.BSC_RPC_URL),
-    }),
-    [Network.POLYGON]: createWalletClient({
-      chain: polygon,
-      transport: http(process.env.POLYGON_RPC_URL),
-    }),
-  };
+  private clients: ViemClientsType;
 
-  constructor(private readonly configService: ConfigService) {}
+  private erc20Abi = parseAbi([
+    'function name() view returns (string)',
+    'function symbol() view returns (string)',
+    'function decimals() view returns (uint8)',
+  ]);
+
+  constructor(private readonly configService: ConfigService) {
+    this.clients = this.createClients();
+  }
 
   async createWallet(network: Network) {
     const privateKey = generatePrivateKey();
@@ -27,46 +28,72 @@ export class ViemProvider {
 
     return {
       network,
-      encryptedPrivateKey: this.encryptPrivateKey(privateKey),
+      encryptedPrivateKey: encryptPrivateKey({ privateKey, configService: this.configService }),
       address: account.address,
     };
   }
 
-  private encryptPrivateKey(privateKey: string): string {
-    const algorithm = 'aes-256-cbc';
-    const key = Buffer.from(this.configService.get<string>('ENCRYPT_KEY', 'super_secret_key'), 'hex');
-    const iv = crypto.randomBytes(16);
+  private createClients(): ViemClientsType {
+    const chainsArr = Object.entries(chains(this.configService));
+    return chainsArr.reduce(
+      (clients, [keyNetwork, value]) => {
+        if (!chains(this.configService)[keyNetwork]) {
+          throw new Error(`Неверная сеть: ${keyNetwork}`);
+        }
 
-    if (key.length !== 32) {
-      throw new Error('Invalid key length. Key must be 32 bytes (256 bits) in hex format.');
-    }
+        clients.public[keyNetwork] = createPublicClient({
+          chain: value.chain,
+          transport: http(value.rpcUrl),
+        });
 
-    const cipher = crypto.createCipheriv(algorithm, key, iv);
-    let encrypted = cipher.update(privateKey, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+        clients.wallet[keyNetwork] = createWalletClient({
+          chain: value.chain,
+          transport: http(value.rpcUrl),
+        });
 
-    return `${iv.toString('hex')}:${encrypted}`;
+        return clients;
+      },
+      { public: {}, wallet: {} } as ViemClientsType,
+    );
   }
 
-  private decryptPrivateKey(encryptedPrivateKey: string): string {
-    const [ivHex, encryptedHex] = encryptedPrivateKey.split(':');
-
-    if (!ivHex || !encryptedHex) {
-      throw new Error('Invalid encrypted string format');
+  async checkToken({
+    address,
+    network,
+  }: {
+    address: Address;
+    network: Network;
+  }): Promise<{ name: string; symbol: string; decimals: number }> {
+    if (!isEthereumAddress(address)) {
+      throw new Error('Неверный формат адреса токена');
     }
 
-    const key = Buffer.from(this.configService.get<string>('ENCRYPT_KEY', 'super_secret_key'), 'hex');
-    const iv = Buffer.from(ivHex, 'hex');
+    const networkClient = this.clients.public[network];
+    try {
+      const chainId = await networkClient.getChainId();
+      const curChain = chains(this.configService)[network];
+      if (chainId !== curChain.chain.id) {
+        throw new Error(`Ошибка подключения к сети ${curChain.name}`);
+      }
 
-    if (key.length !== 32) {
-      throw new Error('Invalid key length. Key must be 32 bytes (256 bits) in hex format.');
+      const [name, symbol, decimals] = await Promise.all([
+        networkClient.readContract({ address, abi: this.erc20Abi, functionName: 'name' }),
+        networkClient.readContract({ address, abi: this.erc20Abi, functionName: 'symbol' }),
+        networkClient.readContract({ address, abi: this.erc20Abi, functionName: 'decimals' }),
+      ]);
+
+      return {
+        name,
+        symbol,
+        decimals,
+      };
+    } catch (error) {
+      console.error(error);
+      if (error instanceof ContractFunctionExecutionError) {
+        throw new Error(`Этого токена не существует в сети ${network}`);
+      }
+      throw new Error(`Ошибка проверки токена`);
     }
-
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
   }
 
   // async getBalance(address: string, network: Network): Promise<string> {
