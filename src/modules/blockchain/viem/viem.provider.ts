@@ -2,7 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { isEthereumAddress } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
-import { createWalletClient, createPublicClient, http, parseAbi, Address, ContractFunctionExecutionError } from 'viem';
+import {
+  createWalletClient,
+  createPublicClient,
+  http,
+  parseAbi,
+  Address,
+  ContractFunctionExecutionError,
+  formatEther,
+} from 'viem';
 
 import { chains } from '@src/utils/constants';
 import { encryptPrivateKey } from '@src/utils/crypto';
@@ -96,8 +104,17 @@ export class ViemProvider {
     }
   }
 
-  // async getBalance(address: string, network: Network): Promise<string> {
-  //   const balance = await this.clients[network].getBalance({ address });
-  //   return parseEther(balance.toString());
-  // }
+  async getBalance({ address, network }: { address: Address; network: Network }): Promise<string> {
+    if (!isEthereumAddress(address)) {
+      throw new Error('Неверный формат адреса');
+    }
+
+    try {
+      const balance = await this.clients.public[network].getBalance({ address });
+      return formatEther(balance);
+    } catch (error) {
+      console.error(error);
+      throw new Error(`Ошибка получения баланса`);
+    }
+  }
 }

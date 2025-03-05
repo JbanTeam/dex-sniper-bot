@@ -5,6 +5,7 @@ import { Bot, GrammyError, HttpError, InlineKeyboard, session } from 'grammy';
 
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { chains, startMessage } from '@src/utils/constants';
 import { BotContext, Network, SessionData } from '@src/types/types';
 
@@ -16,6 +17,7 @@ export class TelegramService implements OnModuleInit {
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
+    private readonly blockchainService: BlockchainService,
   ) {
     this.bot = new Bot<BotContext>(this.configService.get<string>('TELEGRAM_BOT_TOKEN', ''));
     this.setCommands();
@@ -107,6 +109,7 @@ export class TelegramService implements OnModuleInit {
 
       await ctx.reply(registrationMessge, { parse_mode: 'HTML' });
     });
+
     this.bot.command('addtoken', async ctx => {
       if (!ctx.message || !ctx.session.userId) return;
 
@@ -125,6 +128,17 @@ export class TelegramService implements OnModuleInit {
       });
 
       await ctx.reply('Выберите сеть, в которой находится ваш токен', { reply_markup: keyboard });
+    });
+
+    this.bot.command('balance', async ctx => {
+      if (!ctx.message || !ctx.session.userId || !ctx.session.wallets) return;
+
+      const keyboard = new InlineKeyboard();
+      ctx.session.wallets.forEach(wallet => {
+        keyboard.text(`${wallet.network}: ${wallet.address}`, `wallet-${wallet.id}`);
+      });
+
+      await ctx.reply('Выберите кошелек', { reply_markup: keyboard });
     });
   }
 
@@ -163,6 +177,40 @@ export class TelegramService implements OnModuleInit {
     this.bot.callbackQuery(/^net-(.+)/, async ctx => {
       await this.networkKeyboardCb(ctx);
     });
+
+    this.bot.callbackQuery(/^wallet-(.+)/, async ctx => {
+      await this.balanceKeyboardCb(ctx);
+    });
+  }
+
+  private async balanceKeyboardCb(ctx: BotContext) {
+    if (!ctx.match || !ctx.session.userId || !ctx.session.wallets) return;
+    const walletId = +ctx.match[1];
+
+    try {
+      const wallet = ctx.session.wallets.find(wallet => wallet.id === walletId);
+
+      if (!wallet) {
+        await ctx.reply('Кошелек не найден');
+        return;
+      }
+
+      const balance = await this.blockchainService.getBalance({
+        address: wallet.address as Address,
+        network: wallet.network,
+      });
+
+      let reply = `<b>Баланс кошелька:</b>\n`;
+      reply += `<b>Сеть:</b> ${wallet.network}\n`;
+      reply += `<b>Адрес:</b> <code>${wallet.address}</code>\n`;
+      reply += `<b>Баланс:</b> ${balance}\n`;
+
+      await ctx.deleteMessage();
+      await ctx.reply(reply, { parse_mode: 'HTML' });
+    } catch (error) {
+      await ctx.deleteMessage();
+      await ctx.reply(`${error.message}`);
+    }
   }
 
   private async networkKeyboardCb(ctx: BotContext) {

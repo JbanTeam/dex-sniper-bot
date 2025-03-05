@@ -42,9 +42,9 @@ export class BlockchainService {
     return this.viemProvider.checkToken({ address, network });
   }
 
-  // async getBalance(address: string, network: Network): Promise<string> {
-  //   return this.viemProvider.getBalance(address, network);
-  // }
+  async getBalance({ address, network }: { address: Address; network: Network }): Promise<string> {
+    return this.viemProvider.getBalance({ address, network });
+  }
 
   // async monitorAddress(address: string, network: Network): Promise<void> {
   //   return this.viemProvider.monitorAddress(address, network);
