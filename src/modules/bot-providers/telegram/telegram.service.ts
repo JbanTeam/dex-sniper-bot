@@ -124,10 +124,48 @@ export class TelegramService implements OnModuleInit {
       const keyboard = new InlineKeyboard();
       const chainsArr = Object.entries(chains(this.configService));
       chainsArr.forEach(([keyNetwork, value]) => {
-        keyboard.text(value.name, `net-${keyNetwork}`);
+        keyboard.text(value.name, `add-${keyNetwork}`);
       });
 
       await ctx.reply('Выберите сеть, в которой находится ваш токен', { reply_markup: keyboard });
+    });
+
+    this.bot.command('removetoken', async ctx => {
+      if (!ctx.message || !ctx.session.userId || !ctx.session.wallets) return;
+
+      const [, tokenAddress] = ctx.message.text.split(' ');
+
+      try {
+        if (tokenAddress) {
+          const deletedToken = await this.userService.removeToken({
+            userId: ctx.session.userId,
+            address: tokenAddress as Address,
+          });
+
+          if (!deletedToken.affected) {
+            return await ctx.reply('Токен не найден');
+          }
+
+          return await ctx.reply('Токен удален 🔥');
+        }
+
+        const keyboard = new InlineKeyboard();
+        ctx.session.wallets.forEach(wallet => {
+          keyboard.text(`${wallet.network}`, `rm-${wallet.network}`);
+        });
+
+        keyboard.text('Все токены', `rm-all`);
+
+        await ctx.reply(
+          `Выберите действие:\n1. удалить <u>все</u> токены\n2. удалить <u>все</u> токены в выбранной сети`,
+          {
+            reply_markup: keyboard,
+            parse_mode: 'HTML',
+          },
+        );
+      } catch (error) {
+        await ctx.reply(`${error.message}`);
+      }
     });
 
     this.bot.command('balance', async ctx => {
@@ -135,10 +173,10 @@ export class TelegramService implements OnModuleInit {
 
       const keyboard = new InlineKeyboard();
       ctx.session.wallets.forEach(wallet => {
-        keyboard.text(`${wallet.network}: ${wallet.address}`, `wallet-${wallet.id}`);
+        keyboard.text(`${wallet.network}: ${wallet.address}`, `balance-${wallet.id}`);
       });
 
-      await ctx.reply('Выберите кошелек', { reply_markup: keyboard });
+      await ctx.reply('Выберите кошелек:', { reply_markup: keyboard });
     });
   }
 
@@ -174,12 +212,16 @@ export class TelegramService implements OnModuleInit {
   }
 
   private addEventListeners() {
-    this.bot.callbackQuery(/^net-(.+)/, async ctx => {
-      await this.networkKeyboardCb(ctx);
+    this.bot.callbackQuery(/^add-(.+)/, async ctx => {
+      await this.addTokenKeyboardCb(ctx);
     });
 
-    this.bot.callbackQuery(/^wallet-(.+)/, async ctx => {
+    this.bot.callbackQuery(/^balance-(.+)/, async ctx => {
       await this.balanceKeyboardCb(ctx);
+    });
+
+    this.bot.callbackQuery(/^rm-(.+)/, async ctx => {
+      await this.removeTokenKeyboardCb(ctx);
     });
   }
 
@@ -213,7 +255,7 @@ export class TelegramService implements OnModuleInit {
     }
   }
 
-  private async networkKeyboardCb(ctx: BotContext) {
+  private async addTokenKeyboardCb(ctx: BotContext) {
     if (!ctx.match || !ctx.session.tempToken || !ctx.session.userId) return;
     const network = ctx.match[1] as Network;
     const tokenAddress = ctx.session.tempToken;
@@ -233,6 +275,40 @@ export class TelegramService implements OnModuleInit {
       tokens.forEach((token, index) => {
         reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
       });
+
+      await ctx.deleteMessage();
+      await ctx.reply(reply, { parse_mode: 'HTML' });
+    } catch (error) {
+      await ctx.deleteMessage();
+      await ctx.reply(`${error.message}`);
+    }
+  }
+
+  private async removeTokenKeyboardCb(ctx: BotContext) {
+    if (!ctx.match || !ctx.session.userId) return;
+    const network = ctx.match[1] as Network | 'all';
+    const userId = ctx.session.userId;
+
+    try {
+      let reply = '';
+      if (network === 'all') {
+        const deletedTokens = await this.userService.removeToken({
+          userId,
+        });
+
+        if (!deletedTokens) throw new Error('Токены не найдены');
+
+        reply = `Все токены успешно удалены 🔥🔥🔥`;
+      } else {
+        const deletedTokens = await this.userService.removeToken({
+          userId,
+          network,
+        });
+
+        if (!deletedTokens) throw new Error('Токены не найдены');
+
+        reply = `Все токены в сети ${network} успешно удалены 🔥🔥🔥`;
+      }
 
       await ctx.deleteMessage();
       await ctx.reply(reply, { parse_mode: 'HTML' });

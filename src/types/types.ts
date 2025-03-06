@@ -1,5 +1,5 @@
 import { Context, SessionFlavor } from 'grammy';
-import { PublicClient, WalletClient } from 'viem';
+import { Address, PublicClient, WalletClient } from 'viem';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
 
@@ -33,4 +33,10 @@ export type ViemClientsType = {
   wallet: {
     [key in Network]: WalletClient;
   };
+};
+
+export type DeleteConditions = {
+  user: { id: number };
+  network?: Network;
+  address?: Address;
 };

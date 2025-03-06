@@ -1,13 +1,13 @@
-import { EntityManager, Repository } from 'typeorm';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Address } from 'viem';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { DeleteResult, EntityManager, Repository } from 'typeorm';
 
 import { User } from './user.entity';
 import { RegisterDto } from './dto/register.dto';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { Network } from '@src/types/types';
 import { UserToken } from './user-token.entity';
-import { Address } from 'viem';
+import { DeleteConditions, Network } from '@src/types/types';
 
 @Injectable()
 export class UserService {
@@ -92,6 +92,46 @@ export class UserService {
     const tokens = [...user.tokens, token];
 
     return tokens;
+  }
+
+  async removeToken({
+    userId,
+    address,
+    network,
+  }: {
+    userId: number;
+    address?: Address;
+    network?: Network;
+  }): Promise<DeleteResult> {
+    const user = await this.findById({ id: userId });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const { tokens } = user;
+
+    if (!tokens.length) {
+      throw new Error('У вас нет сохраненных токенов');
+    }
+
+    if (network && !tokens.some(t => t.network === network)) {
+      throw new Error('Токены не найдены в указанной сети');
+    }
+
+    if (address && !tokens.some(t => t.address === address)) {
+      throw new Error('Токен не найден');
+    }
+
+    const deleteConditions: DeleteConditions = { user: { id: userId } };
+
+    if (address) {
+      deleteConditions.address = address;
+    } else if (network) {
+      deleteConditions.network = network;
+    }
+
+    return this.userTokenRepository.delete(deleteConditions);
   }
 
   async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
