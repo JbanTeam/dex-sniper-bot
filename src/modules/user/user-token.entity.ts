@@ -29,6 +29,6 @@ export class UserToken {
   @IsNumber()
   decimals: number;
 
-  @ManyToOne(() => User, user => user.tokens)
+  @ManyToOne(() => User, user => user.tokens, { onDelete: 'CASCADE' })
   user: User;
 }

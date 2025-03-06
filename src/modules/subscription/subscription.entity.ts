@@ -18,7 +18,7 @@ export class Subscription {
   @IsEnum(Network)
   network: Network;
 
-  @ManyToOne(() => User, user => user.subscriptions)
+  @ManyToOne(() => User, user => user.subscriptions, { onDelete: 'CASCADE' })
   user: User;
 
   // @ManyToOne(() => UserToken, token => token.subscriptions)

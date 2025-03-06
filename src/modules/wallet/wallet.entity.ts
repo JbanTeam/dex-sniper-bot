@@ -21,6 +21,6 @@ export class Wallet {
   @IsString()
   encryptedPrivateKey: string;
 
-  @ManyToOne(() => User, user => user.wallets)
+  @ManyToOne(() => User, user => user.wallets, { onDelete: 'CASCADE' })
   user: User;
 }

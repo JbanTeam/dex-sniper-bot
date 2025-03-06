@@ -21,15 +21,15 @@ export class User {
   @CreateDateColumn()
   createdAt: Date;
 
-  @OneToMany(() => UserToken, token => token.user)
+  @OneToMany(() => UserToken, token => token.user, { cascade: true })
   @ValidateNested({ each: true })
   tokens: UserToken[];
 
-  @OneToMany(() => Subscription, subscription => subscription.user)
+  @OneToMany(() => Subscription, subscription => subscription.user, { cascade: true })
   @ValidateNested({ each: true })
   subscriptions: Subscription[];
 
-  @OneToMany(() => Wallet, wallet => wallet.user)
+  @OneToMany(() => Wallet, wallet => wallet.user, { cascade: true })
   @ValidateNested({ each: true })
   wallets: Wallet[];
 }
