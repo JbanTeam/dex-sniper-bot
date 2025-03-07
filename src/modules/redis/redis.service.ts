@@ -8,9 +8,8 @@ import { SessionData } from '@src/types/types';
 @Injectable()
 export class RedisService {
   private readonly redisClient: Redis;
-  private readonly configService: ConfigService;
 
-  constructor(configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
     this.configService = configService;
     this.redisClient = new Redis({
       host: this.configService.get<string>('REDIS_HOST', 'localhost'),

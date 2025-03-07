@@ -4,8 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { databaseConfig } from './config/database.config';
 import { UserModule } from './modules/user/user.module';
-import { TelegramModule } from './modules/bot-providers/telegram/telegram.module';
 import { RedisModule } from './modules/redis/redis.module';
+import { BotModule } from '@modules/bot-providers/bot.module';
 
 const envPath =
   process.env.NODE_ENV === 'development' ? '.env.dev' : process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
@@ -21,7 +21,7 @@ const envPath =
       },
     }),
     UserModule,
-    TelegramModule,
+    BotModule,
     RedisModule,
   ],
 })
