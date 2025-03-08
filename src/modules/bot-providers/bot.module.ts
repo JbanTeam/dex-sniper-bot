@@ -6,8 +6,9 @@ import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { BotService } from './bot.service';
 import { TelegramBot } from './telegram/telegram-bot';
 import { BotProvider } from './bot.provider';
-import { CommandHandler } from './utils/command-handler';
-import { MessageHandler } from './utils/message-handler';
+import { CommandHandler } from './telegram/utils/command-handler';
+import { MessageHandler } from './telegram/utils/message-handler';
+import { QueryHandler } from './telegram/utils/query-handler';
 
 @Module({
   imports: [UserModule, RedisModule, BlockchainModule],
@@ -17,11 +18,16 @@ import { MessageHandler } from './utils/message-handler';
     TelegramBot,
     MessageHandler,
     CommandHandler,
+    QueryHandler,
     {
       provide: 'TelegramBotProvider',
-      useFactory: (telegramBot: TelegramBot, messageHandler: MessageHandler, commandHandler: CommandHandler) =>
-        new BotProvider(telegramBot, messageHandler, commandHandler),
-      inject: [TelegramBot, MessageHandler, CommandHandler],
+      useFactory: (
+        telegramBot: TelegramBot,
+        messageHandler: MessageHandler,
+        commandHandler: CommandHandler,
+        queryHandler: QueryHandler,
+      ) => new BotProvider(telegramBot, messageHandler, commandHandler, queryHandler),
+      inject: [TelegramBot, MessageHandler, CommandHandler, QueryHandler],
     },
   ],
   exports: [BotService, 'TelegramBotProvider'],

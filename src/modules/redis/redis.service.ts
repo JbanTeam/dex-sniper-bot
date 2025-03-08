@@ -29,6 +29,15 @@ export class RedisService {
     }
   }
 
+  async setSessionData(key: string, sessionData: SessionData): Promise<void> {
+    try {
+      await this.redisClient.set(key, JSON.stringify(sessionData));
+    } catch (error) {
+      console.error('Error setting session data in Redis:', error);
+      throw error;
+    }
+  }
+
   async get(key: string): Promise<string | null> {
     try {
       return await this.redisClient.get(key);
@@ -36,6 +45,11 @@ export class RedisService {
       console.error('Error getting value from Redis:', error);
       throw error;
     }
+  }
+
+  async getSessionData(key: string): Promise<SessionData | undefined> {
+    const data: string | null = await this.redisClient.get(key);
+    return this.parseSessionData(data);
   }
 
   async del(key: string): Promise<void> {

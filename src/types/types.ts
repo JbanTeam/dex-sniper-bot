@@ -4,17 +4,27 @@ import { Address, PublicClient, WalletClient } from 'viem';
 import { Wallet } from '@modules/wallet/wallet.entity';
 
 export interface BotProviderInterface {
-  sendMessage(chatId: number, text: string): Promise<void> | Promise<TelegramMessageResponse>;
-  onMessage(callback: (message: IncomingMessage) => void | Promise<void>): Promise<void>;
+  sendMessage({
+    chatId,
+    text,
+    options,
+  }: {
+    chatId: number;
+    text: string;
+    options?: SendMessageOptions;
+  }): Promise<void> | Promise<MessageResponse>;
+  deleteMessage({ chatId, messageId }: { chatId: number; messageId: number }): Promise<void>;
+  onMessage(callback: (message: IncomingMessage | IncomingQuery) => void | Promise<void>): Promise<void>;
 }
 
 export interface SendMessageOptions {
   parse_mode?: 'html' | 'markdown' | 'markdownv2';
   disable_web_page_preview?: boolean;
   disable_notification?: boolean;
+  reply_markup?: object;
 }
 
-export interface TelegramMessageResponse {
+export interface MessageResponse {
   ok: boolean;
   description?: string;
   result: {
@@ -30,39 +40,17 @@ export type IncomingMessage = {
   chatId: number;
   text: string;
   timestamp: Date;
+  messageId: number;
   user?: {
     id: number;
     username?: string;
   };
 };
 
-export interface TelegramUpdate {
-  update_id: number;
-  message: {
-    message_id: number;
-    from: {
-      id: number;
-      is_bot: boolean;
-      first_name: string;
-      username: string;
-      language_code: string;
-    };
-    chat: {
-      id: number;
-      first_name: string;
-      username: string;
-      type: string;
-    };
-    date: number;
-    text: string;
-  };
-}
-
-export interface TelegramUpdateResponse {
-  ok: boolean;
-  result: TelegramUpdate[];
-  description?: string;
-}
+export type IncomingQuery = Omit<IncomingMessage, 'text'> & {
+  data: string;
+  query_id: number;
+};
 
 type CustomState = {
   state: {
@@ -85,6 +73,7 @@ export interface SessionData {
   chatId?: number;
   telegramUserId?: number;
   wallets?: Wallet[];
+  action?: string;
 }
 
 export type ViemClientsType = {

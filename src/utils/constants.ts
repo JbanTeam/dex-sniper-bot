@@ -19,6 +19,16 @@ export const startMessage = `
 Используйте команду /help, чтобы увидеть список команд.
 `;
 
+export const helpMessage = `
+Доступные команды:
+/start - Приветствие, функциональность
+/help - Помощь
+/addtoken - Добавить токен, /addtoken [адрес_токена]
+/removetoken - Удалить токены, /removetoken [адрес_токена] - удалить токен
+/balance - Посмотреть баланс
+/my_subscribes - Посмотреть мои подписки
+`;
+
 export const chains = (configService: ConfigService) => {
   return {
     [Network.BSC]: {
