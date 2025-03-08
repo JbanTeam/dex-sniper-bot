@@ -96,7 +96,7 @@ export class ViemProvider {
         decimals,
       };
     } catch (error) {
-      console.error(error);
+      console.error(error.message);
       if (error instanceof ContractFunctionExecutionError) {
         throw new Error(`Этого токена не существует в сети ${network}`);
       }

@@ -1,10 +1,11 @@
 import axios from 'axios';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { RedisService } from '@modules/redis/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from '@modules/user/user.service';
 import { CallbackQuery, Message, TelegramUpdateResponse } from './utils/types';
+import { isCallbackQueryUpdate, isMessageUpdate } from './utils/utils';
 import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
 
 @Injectable()
@@ -72,13 +73,15 @@ export class TelegramBot implements BotProviderInterface {
           for (const update of data.result) {
             if (update.message) {
               const message = this.parseMessage(update.message);
-              await this.middlewares(update.message);
+              await this.setSession(update.message);
               await callback(message);
             } else if (update.callback_query) {
               const query = this.parseQuery(update.callback_query);
+              await this.setSession(update.callback_query);
               await callback(query);
             }
-            offset = update.update_id + 1;
+
+            if (update) offset = update.update_id + 1;
           }
         }
       } catch (error) {
@@ -88,31 +91,26 @@ export class TelegramBot implements BotProviderInterface {
     }
   }
 
-  private parseMessage(message: Message): IncomingMessage {
-    return {
-      chatId: message.chat.id,
-      text: message.text || '',
-      messageId: message.message_id,
-      timestamp: new Date(message.date * 1000),
-      user: {
-        id: message.from?.id || 0,
-        username: message.from?.username,
-      },
-    };
-  }
+  async notifyUser({ userId, chatId, message }: { userId: number; chatId: number; message: string }) {
+    const userSession = await this.redisService.getSessionData(chatId.toString());
 
-  private parseQuery(query: CallbackQuery): IncomingQuery {
-    return {
-      query_id: query.id,
-      chatId: query?.message?.chat.id || 0,
-      data: query.data || '',
-      messageId: query.message?.message_id || 0,
-      timestamp: query.message?.date ? new Date(query?.message?.date * 1000) : new Date(),
-      user: {
-        id: query.message?.from?.id || 0,
-        username: query.message?.from?.username || '',
-      },
-    };
+    if (userSession?.chatId) {
+      return await this.sendMessage({ chatId: userSession.chatId, text: message });
+    }
+
+    const user = await this.userService.findById({ id: userId });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.redisService.setSessionData(chatId.toString(), {
+      chatId: user.chatId,
+      telegramUserId: user.telegramUserId,
+      action: 'get',
+      userId: user.id,
+      wallets: user.wallets,
+    });
+    await this.sendMessage({ chatId: user.chatId, text: message });
   }
 
   async setCommands(): Promise<void> {
@@ -146,11 +144,8 @@ export class TelegramBot implements BotProviderInterface {
     }
   }
 
-  private async middlewares(message: Message): Promise<void> {
-    if (!message.from || !message.chat) return;
-
-    const chatId = message.chat.id;
-    const telegramUserId = message.from.id;
+  private async setSession(update: Message | CallbackQuery): Promise<void> {
+    const { chatId, telegramUserId } = this.checkUpdate(update);
 
     const userSession = await this.redisService.getSessionData(chatId.toString());
 
@@ -165,15 +160,13 @@ export class TelegramBot implements BotProviderInterface {
       telegramUserId,
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
-    user.wallets.forEach(wallet => {
-      if (wallet.encryptedPrivateKey) {
-        wallet.encryptedPrivateKey = '';
-      }
-    });
+    // user.wallets.forEach(wallet => {
+    //   if (wallet.encryptedPrivateKey) {
+    //     wallet.encryptedPrivateKey = '';
+    //   }
+    // });
 
     await this.redisService.setSessionData(chatId.toString(), {
       chatId,
@@ -181,6 +174,50 @@ export class TelegramBot implements BotProviderInterface {
       userId: user.id,
       action,
       wallets: [...user.wallets],
+      tokens: [...user.tokens],
     });
+  }
+
+  private checkUpdate(update: Message | CallbackQuery): { chatId: number; telegramUserId: number } {
+    if (isMessageUpdate(update)) {
+      return {
+        chatId: update.chat.id,
+        telegramUserId: update.from?.id || 0,
+      };
+    } else if (isCallbackQueryUpdate(update)) {
+      return {
+        chatId: update.message?.chat.id || 0,
+        telegramUserId: update.from.id,
+      };
+    } else {
+      throw new BadRequestException('Invalid chatId or telegramUserId');
+    }
+  }
+
+  private parseMessage(message: Message): IncomingMessage {
+    return {
+      chatId: message.chat.id,
+      text: message.text || '',
+      messageId: message.message_id,
+      timestamp: new Date(message.date * 1000),
+      user: {
+        id: message.from?.id || 0,
+        username: message.from?.username,
+      },
+    };
+  }
+
+  private parseQuery(query: CallbackQuery): IncomingQuery {
+    return {
+      query_id: query.id,
+      chatId: query?.message?.chat.id || 0,
+      data: query.data || '',
+      messageId: query.message?.message_id || 0,
+      timestamp: query.message?.date ? new Date(query?.message?.date * 1000) : new Date(),
+      user: {
+        id: query.message?.from?.id || 0,
+        username: query.message?.from?.username || '',
+      },
+    };
   }
 }

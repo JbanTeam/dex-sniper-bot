@@ -2,6 +2,7 @@ import { Context, SessionFlavor } from 'grammy';
 import { Address, PublicClient, WalletClient } from 'viem';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
+import { UserToken } from '@modules/user/user-token.entity';
 
 export interface BotProviderInterface {
   sendMessage({
@@ -66,13 +67,13 @@ export enum Network {
 }
 
 export interface SessionData {
-  state?: 'ADDING_TOKEN' | 'WAITING_WALLET_TYPE';
   tempToken?: string;
   tempNetwork?: Network;
   userId?: number;
   chatId?: number;
   telegramUserId?: number;
   wallets?: Wallet[];
+  tokens?: UserToken[];
   action?: string;
 }
 

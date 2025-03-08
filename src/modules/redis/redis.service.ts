@@ -32,6 +32,7 @@ export class RedisService {
   async setSessionData(key: string, sessionData: SessionData): Promise<void> {
     try {
       await this.redisClient.set(key, JSON.stringify(sessionData));
+      await this.redisClient.expire(key, 3600 * 24 * 30);
     } catch (error) {
       console.error('Error setting session data in Redis:', error);
       throw error;
@@ -66,7 +67,8 @@ export class RedisService {
     try {
       const sessionData = JSON.parse(data) as object;
       if (
-        !('state' in sessionData) &&
+        !('wallets' in sessionData) &&
+        !('tokens' in sessionData) &&
         !('tempToken' in sessionData) &&
         !('tempNetwork' in sessionData) &&
         !('userId' in sessionData) &&

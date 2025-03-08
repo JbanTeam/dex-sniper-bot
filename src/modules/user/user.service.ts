@@ -4,9 +4,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DeleteResult, EntityManager, Repository } from 'typeorm';
 
 import { User } from './user.entity';
-import { RegisterDto } from './dto/register.dto';
-import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { UserToken } from './user-token.entity';
+import { RegisterDto } from './dto/register.dto';
+import { RedisService } from '@modules/redis/redis.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { DeleteConditions, Network } from '@src/types/types';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class UserService {
     @InjectRepository(UserToken)
     private readonly userTokenRepository: Repository<UserToken>,
     private readonly blockchainService: BlockchainService,
+    private readonly redisService: RedisService,
   ) {}
 
   async getOrCreateUser({ chatId, telegramUserId }: RegisterDto): Promise<{ action: string; user: User | null }> {
@@ -87,29 +89,31 @@ export class UserService {
       decimals,
     });
 
-    await this.userTokenRepository.save(token);
+    const savedToken = await this.userTokenRepository.save(token);
 
-    const tokens = [...user.tokens, token];
+    const tokens = [...user.tokens, savedToken];
 
     return tokens;
   }
 
   async removeToken({
     userId,
+    chatId,
     address,
     network,
   }: {
     userId: number;
+    chatId: number;
     address?: Address;
     network?: Network;
   }): Promise<DeleteResult> {
-    const user = await this.findById({ id: userId });
+    const userSession = await this.redisService.getSessionData(chatId.toString());
 
-    if (!user) {
-      throw new NotFoundException('User not found');
+    if (!userSession || !userSession.userId || !userSession.chatId || !userSession.tokens) {
+      throw new Error('Пользователь не найден');
     }
 
-    const { tokens } = user;
+    const { tokens } = userSession;
 
     if (!tokens.length) {
       throw new Error('У вас нет сохраненных токенов');
@@ -131,7 +135,15 @@ export class UserService {
       deleteConditions.network = network;
     }
 
-    return this.userTokenRepository.delete(deleteConditions);
+    const deleteResult = await this.userTokenRepository.delete(deleteConditions);
+    const user = await this.findById({ id: userId });
+
+    await this.redisService.setSessionData(chatId.toString(), {
+      ...userSession,
+      tokens: user?.tokens || [],
+    });
+
+    return deleteResult;
   }
 
   async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
@@ -144,6 +156,19 @@ export class UserService {
         createdAt: true,
         chatId: true,
         telegramUserId: true,
+        tokens: {
+          id: true,
+          address: true,
+          network: true,
+          name: true,
+          symbol: true,
+          decimals: true,
+        },
+        wallets: {
+          id: true,
+          address: true,
+          network: true,
+        },
       },
     });
 

@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
-import { UserService } from './user.service';
 import { User } from './user.entity';
-import { BlockchainModule } from '@modules/blockchain/blockchain.module';
+import { UserService } from './user.service';
 import { UserToken } from './user-token.entity';
+import { BlockchainModule } from '@modules/blockchain/blockchain.module';
+import { RedisModule } from '@modules/redis/redis.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, UserToken]), BlockchainModule],
+  imports: [TypeOrmModule.forFeature([User, UserToken]), BlockchainModule, RedisModule],
   providers: [UserService],
   exports: [UserService],
 })

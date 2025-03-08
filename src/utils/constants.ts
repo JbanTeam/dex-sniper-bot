@@ -35,11 +35,13 @@ export const chains = (configService: ConfigService) => {
       name: 'Binance Smart Chain',
       rpcUrl: configService.get<string>('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/'),
       chain: bsc,
+      nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
     },
     [Network.POLYGON]: {
       name: 'Polygon',
       rpcUrl: configService.get<string>('POLYGON_RPC_URL', 'https://polygon-rpc.com/'),
       chain: polygon,
+      nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
     },
   };
 };
