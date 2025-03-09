@@ -109,13 +109,13 @@ export class UserService {
   }): Promise<DeleteResult> {
     const userSession = await this.redisService.getSessionData(chatId.toString());
 
-    if (!userSession || !userSession.userId || !userSession.chatId || !userSession.tokens) {
+    if (!userSession || !userSession.userId || !userSession.chatId) {
       throw new Error('Пользователь не найден');
     }
 
     const { tokens } = userSession;
 
-    if (!tokens.length) {
+    if (!tokens?.length) {
       throw new Error('У вас нет сохраненных токенов');
     }
 

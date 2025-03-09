@@ -116,14 +116,14 @@ export class QueryHandler {
       if (!wallet) return { text: 'Кошелек не найден' };
 
       const balance = await this.blockchainService.getBalance({
+        chatId: query.chatId,
         address: wallet.address as Address,
         network: wallet.network,
       });
 
-      let reply = `<b>Баланс кошелька:</b>\n`;
+      let reply = `<b>Адрес:</b> <code>${wallet.address}</code>\n`;
       reply += `<b>Сеть:</b> ${wallet.network}\n`;
-      reply += `<b>Адрес:</b> <code>${wallet.address}</code>\n`;
-      reply += `<b>Баланс:</b> ${balance}\n`;
+      reply += `${balance}`;
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
