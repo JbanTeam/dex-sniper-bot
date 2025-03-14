@@ -3,6 +3,9 @@ services:
     build:
       target: development
     container_name: dex_sniper-dev-app
+    depends_on:
+      anvil:
+        condition: service_started
     volumes:
       - ./:/usr/app
       - /usr/app/node_modules
@@ -12,6 +15,24 @@ services:
     container_name: dex_sniper-dev-db
     volumes:
       - pg_DEV_data:/var/lib/postgresql/data
+
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: dex_sniper-anvil
+    environment:
+      ANVIL_IP_ADDR: '0.0.0.0'
+    working_dir: /anvil
+    volumes:
+      - ./anvil_data:/anvil_data
+      - ./entrypoint_anvil.sh:/entrypoint_anvil.sh
+    ports:
+      - '8545:8545'
+    networks:
+      - dex_network
+    restart: unless-stopped
+    stop_signal: SIGINT
+    stop_grace_period: 5s
+    entrypoint: ['/bin/sh', '/entrypoint_anvil.sh']
 
 volumes:
   pg_DEV_data:

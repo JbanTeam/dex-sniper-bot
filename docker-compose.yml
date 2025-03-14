@@ -37,20 +37,20 @@ services:
     networks:
       - dex_network
 
-  pgadmin:
-    image: dpage/pgadmin4:9.1
-    container_name: dex_sniper-pgadmin
-    restart: always
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - '${PGADMIN_PORT}:80'
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - dex_network
+  # pgadmin:
+  #   image: dpage/pgadmin4:9.1
+  #   container_name: dex_sniper-pgadmin
+  #   restart: always
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+  #   ports:
+  #     - '${PGADMIN_PORT}:80'
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   networks:
+  #     - dex_network
 
   redis:
     image: redis:7.4.2-alpine

@@ -4,21 +4,28 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { RedisService } from '@modules/redis/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from '@modules/user/user.service';
-import { CallbackQuery, Message, TelegramUpdateResponse } from './utils/types';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { isCallbackQueryUpdate, isMessageUpdate } from './utils/utils';
+import { CallbackQuery, Message, TelegramUpdateResponse } from './utils/types';
 import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
 
 @Injectable()
 export class TelegramBot implements BotProviderInterface {
   private TG_URL: string = 'https://api.telegram.org/bot';
+  private nodeEnv: string;
+  private firstSessionAssign: boolean;
 
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
+    private readonly blockchainService: BlockchainService,
     private readonly configService: ConfigService,
   ) {
     const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
+    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.firstSessionAssign = this.nodeEnv !== 'production';
     this.TG_URL += token;
+
     this.setCommands().catch(console.error);
   }
 
@@ -120,7 +127,7 @@ export class TelegramBot implements BotProviderInterface {
       { command: 'addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
       { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
       { command: 'balance', description: 'Посмотреть баланс' },
-      { command: 'my_subscribes', description: 'Посмотреть мои подписки' },
+      { command: 'subscriptions', description: 'Посмотреть мои подписки' },
     ];
 
     const url = `${this.TG_URL}/setMyCommands`;
@@ -149,9 +156,9 @@ export class TelegramBot implements BotProviderInterface {
 
     const userSession = await this.redisService.getSessionData(chatId.toString());
 
-    if (userSession?.chatId === chatId && userSession?.telegramUserId === telegramUserId) {
-      await this.redisService.setSessionData(chatId.toString(), { ...userSession, action: 'get' });
+    if (userSession) {
       userSession.action = 'get';
+      await this.redisService.setSessionData(chatId.toString(), userSession);
       return;
     }
 
@@ -161,12 +168,6 @@ export class TelegramBot implements BotProviderInterface {
     });
 
     if (!user) throw new NotFoundException('User not found');
-
-    // user.wallets.forEach(wallet => {
-    //   if (wallet.encryptedPrivateKey) {
-    //     wallet.encryptedPrivateKey = '';
-    //   }
-    // });
 
     await this.redisService.setSessionData(chatId.toString(), {
       chatId,

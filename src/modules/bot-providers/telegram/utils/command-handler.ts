@@ -1,17 +1,20 @@
+import { Address } from 'viem';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { isEthereumAddress } from 'class-validator';
 
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { chains, helpMessage, startMessage } from '@src/utils/constants';
 import { IncomingMessage, SendMessageOptions } from '@src/types/types';
-import { Address } from 'viem';
 
 @Injectable()
 export class CommandHandler {
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
+    private readonly blockchainService: BlockchainService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -37,42 +40,50 @@ export class CommandHandler {
   private async addToken(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     const [, tokenAddress] = message.text.split(' ');
 
-    const userSession = await this.redisService.getSessionData(message.chatId.toString());
+    try {
+      const userSession = await this.redisService.getSessionData(message.chatId.toString());
 
-    if (!tokenAddress) {
+      if (!userSession) throw new Error('Пользователь не найден');
+
+      if (!tokenAddress || !isEthereumAddress(tokenAddress)) {
+        throw new Error('Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
+      }
+
+      await this.redisService.setSessionData(message.chatId.toString(), {
+        ...userSession,
+        tempToken: tokenAddress,
+      });
+
+      const chainsArr = Object.entries(chains(this.configService));
+      const keardboard = chainsArr.map(([keyNetwork, value]) => {
+        return [{ text: value.name, callback_data: `add-${keyNetwork}` }];
+      });
+
       return {
-        text: 'Введите адрес токена. Пример: /addtoken [адрес_токена]',
-        options: { parse_mode: 'html' },
+        text: 'Выберите сеть, в которой находится ваш токен:',
+        options: {
+          parse_mode: 'html',
+          reply_markup: { inline_keyboard: keardboard },
+        },
       };
+    } catch (error) {
+      console.log(`Error while removing token: ${error.message}`);
+      return { text: `${error.message}` };
     }
-
-    await this.redisService.setSessionData(message.chatId.toString(), {
-      ...userSession,
-      tempToken: tokenAddress,
-    });
-
-    const chainsArr = Object.entries(chains(this.configService));
-    const keardboard = chainsArr.map(([keyNetwork, value]) => {
-      return [{ text: value.name, callback_data: `add-${keyNetwork}` }];
-    });
-
-    return {
-      text: 'Выберите сеть, в которой находится ваш токен:',
-      options: {
-        parse_mode: 'html',
-        reply_markup: { inline_keyboard: keardboard },
-      },
-    };
   }
 
   private async removeToken(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     const [, tokenAddress] = message.text.split(' ');
 
-    const userSession = await this.redisService.getSessionData(message.chatId.toString());
-
-    if (!userSession || !userSession.userId || !userSession.chatId) return { text: 'Пользователь не найден' };
-
     try {
+      const userSession = await this.redisService.getSessionData(message.chatId.toString());
+
+      if (!userSession) throw new Error('Пользователь не найден');
+
+      if (!userSession.tokens?.length) {
+        throw new Error('У вас нет сохраненных токенов');
+      }
+
       if (tokenAddress) {
         const deletedToken = await this.userService.removeToken({
           userId: userSession.userId,
@@ -80,7 +91,7 @@ export class CommandHandler {
           address: tokenAddress as Address,
         });
 
-        if (!deletedToken.affected) return { text: 'Токен не найден' };
+        if (!deletedToken.affected) throw new Error('Токен не найден');
 
         return { text: 'Токен успешно удален 🔥' };
       }
@@ -105,14 +116,35 @@ export class CommandHandler {
   }
 
   private async getBalance(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
-    const userSession = await this.redisService.getSessionData(message.chatId.toString());
+    const [, walletAddress] = message.text.split(' ');
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
 
-    if (!userSession || !userSession.userId || !userSession.wallets) return { text: 'Пользователь не найден' };
+    try {
+      const userSession = await this.redisService.getSessionData(message.chatId.toString());
+      if (!userSession) throw new Error('Пользователь не найден');
 
-    const keyboard = userSession.wallets?.map(wallet => {
-      return [{ text: `${wallet.network}: ${wallet.address}`, callback_data: `balance-${wallet.id}` }];
-    });
+      // TODO: может лучше устанавливать тестовый баланс при добавлении пользователя в сессию
+      if (walletAddress && nodeEnv !== 'production') {
+        const wallet = userSession.wallets?.find(wallet => wallet.address === walletAddress);
+        if (!wallet) throw new Error('Кошелек не найден');
 
-    return { text: 'Выберите кошелек:', options: { reply_markup: { inline_keyboard: keyboard } } };
+        const balance = await this.blockchainService.setTestBalance({
+          chatId: message.chatId,
+          network: wallet?.network,
+          address: wallet.address as Address,
+        });
+
+        return { text: balance, options: { parse_mode: 'html' } };
+      }
+
+      const keyboard = userSession.wallets?.map(wallet => {
+        return [{ text: `${wallet.network}: ${wallet.address}`, callback_data: `balance-${wallet.id}` }];
+      });
+
+      return { text: 'Выберите кошелек:', options: { reply_markup: { inline_keyboard: keyboard } } };
+    } catch (error) {
+      console.log(`Error while removing token: ${error.message}`);
+      return { text: `${error.message}` };
+    }
   }
 }

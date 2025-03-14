@@ -1,5 +1,4 @@
-import { Context, SessionFlavor } from 'grammy';
-import { Address, PublicClient, WalletClient } from 'viem';
+import { Address } from 'viem';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
@@ -53,14 +52,6 @@ export type IncomingQuery = Omit<IncomingMessage, 'text'> & {
   query_id: number;
 };
 
-type CustomState = {
-  state: {
-    action: string;
-  };
-};
-
-export type BotContext = Context & SessionFlavor<SessionData> & CustomState;
-
 export enum Network {
   BSC = 'BSC',
   POLYGON = 'POLYGON',
@@ -69,21 +60,21 @@ export enum Network {
 export interface SessionData {
   tempToken?: string;
   tempNetwork?: Network;
-  userId?: number;
-  chatId?: number;
-  telegramUserId?: number;
-  wallets?: Wallet[];
+  userId: number;
+  chatId: number;
+  telegramUserId: number;
+  wallets: Wallet[];
   tokens?: UserToken[];
+  testTokens?: UserTestToken[];
   action?: string;
 }
 
-export type ViemClientsType = {
-  public: {
-    [key in Network]: PublicClient;
-  };
-  wallet: {
-    [key in Network]: WalletClient;
-  };
+export type UserTestToken = {
+  address: Address;
+  network: Network;
+  name: string;
+  symbol: string;
+  decimals: number;
 };
 
 export type DeleteConditions = {

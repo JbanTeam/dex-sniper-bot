@@ -7,6 +7,6 @@ export class MessageHandler {
 
   async handleMessage(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     console.log(message.text);
-    return { text: 'Вы ввели некорректную валютную пару. Введите валютную пару в формате USD-EUR.' };
+    return { text: 'Разговоры ни к чему, мы здесь серьезными вещами занимаемся' };
   }
 }

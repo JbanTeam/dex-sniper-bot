@@ -8,7 +8,7 @@ import { UserToken } from './user-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { DeleteConditions, Network } from '@src/types/types';
+import { DeleteConditions, Network, UserTestToken } from '@src/types/types';
 
 @Injectable()
 export class UserService {
@@ -62,7 +62,7 @@ export class UserService {
     userId: number;
     address: Address;
     network: Network;
-  }): Promise<UserToken[]> {
+  }): Promise<{ tokens: UserToken[]; testTokens?: UserTestToken[] }> {
     const user = await this.findById({ id: userId });
 
     if (!user) {
@@ -90,10 +90,18 @@ export class UserService {
     });
 
     const savedToken = await this.userTokenRepository.save(token);
+    const tokenWithoutUserField = await this.userTokenRepository.findOne({ where: { id: savedToken.id } });
+    if (!tokenWithoutUserField) throw new Error('Токен не найден');
 
-    const tokens = [...user.tokens, savedToken];
+    const tokens = [...user.tokens, tokenWithoutUserField];
 
-    return tokens;
+    const testTokens = await this.blockchainService.createTestTokens({
+      wallets: user.wallets,
+      tokens: [token],
+      chatId: user.chatId,
+    });
+
+    return { tokens, testTokens };
   }
 
   async removeToken({
@@ -109,15 +117,11 @@ export class UserService {
   }): Promise<DeleteResult> {
     const userSession = await this.redisService.getSessionData(chatId.toString());
 
-    if (!userSession || !userSession.userId || !userSession.chatId) {
-      throw new Error('Пользователь не найден');
-    }
+    if (!userSession) throw new Error('Пользователь не найден');
 
     const { tokens } = userSession;
 
-    if (!tokens?.length) {
-      throw new Error('У вас нет сохраненных токенов');
-    }
+    if (!tokens?.length) throw new Error('У вас нет сохраненных токенов');
 
     if (network && !tokens.some(t => t.network === network)) {
       throw new Error('Токены не найдены в указанной сети');
@@ -137,11 +141,14 @@ export class UserService {
 
     const deleteResult = await this.userTokenRepository.delete(deleteConditions);
     const user = await this.findById({ id: userId });
+    userSession.tokens = user?.tokens || [];
 
-    await this.redisService.setSessionData(chatId.toString(), {
-      ...userSession,
-      tokens: user?.tokens || [],
-    });
+    if (userSession.testTokens?.length) {
+      const namesSet = new Set(user?.tokens.map(item => item.name));
+      userSession.testTokens = userSession.testTokens.filter(item => namesSet.has(item.name));
+    }
+
+    await this.redisService.setSessionData(chatId.toString(), userSession);
 
     return deleteResult;
   }
