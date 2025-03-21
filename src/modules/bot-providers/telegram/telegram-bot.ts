@@ -99,10 +99,9 @@ export class TelegramBot implements BotProviderInterface {
   }
 
   async notifyUser({ userId, chatId, message }: { userId: number; chatId: number; message: string }) {
-    const userSession = await this.redisService.getSessionData(chatId.toString());
-
-    if (userSession?.chatId) {
-      return await this.sendMessage({ chatId: userSession.chatId, text: message });
+    const usersIds = await this.redisService.getUsersSet();
+    if (!usersIds.includes(chatId.toString())) {
+      return await this.sendMessage({ chatId, text: message });
     }
 
     const user = await this.userService.findById({ id: userId });
@@ -110,12 +109,14 @@ export class TelegramBot implements BotProviderInterface {
       throw new NotFoundException('User not found');
     }
 
-    await this.redisService.setSessionData(chatId.toString(), {
+    await this.redisService.addUser({
       chatId: user.chatId,
       telegramUserId: user.telegramUserId,
       action: 'get',
       userId: user.id,
-      wallets: user.wallets,
+      wallets: [...user.wallets],
+      tokens: [...user.tokens],
+      subscriptions: [...user.subscriptions],
     });
     await this.sendMessage({ chatId: user.chatId, text: message });
   }
@@ -126,6 +127,8 @@ export class TelegramBot implements BotProviderInterface {
       { command: 'help', description: 'Помощь' },
       { command: 'addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
       { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
+      { command: 'follow', description: 'Подписаться на кошелек, /follow [адрес_кошелька]' },
+      { command: 'unfollow', description: 'Отписаться от кошелька, /unfollow [адрес_кошелька]' },
       { command: 'balance', description: 'Посмотреть баланс' },
       { command: 'subscriptions', description: 'Посмотреть мои подписки' },
     ];
@@ -154,11 +157,10 @@ export class TelegramBot implements BotProviderInterface {
   private async setSession(update: Message | CallbackQuery): Promise<void> {
     const { chatId, telegramUserId } = this.checkUpdate(update);
 
-    const userSession = await this.redisService.getSessionData(chatId.toString());
+    const userId = await this.redisService.getUserId(chatId);
 
-    if (userSession) {
-      userSession.action = 'get';
-      await this.redisService.setSessionData(chatId.toString(), userSession);
+    if (userId) {
+      await this.redisService.setUserField(chatId, 'action', 'get');
       return;
     }
 
@@ -167,15 +169,17 @@ export class TelegramBot implements BotProviderInterface {
       telegramUserId,
     });
 
+    // TODO: fix errors, write separate error for telegram, and check it
     if (!user) throw new NotFoundException('User not found');
 
-    await this.redisService.setSessionData(chatId.toString(), {
+    await this.redisService.addUser({
       chatId,
       telegramUserId,
       userId: user.id,
       action,
       wallets: [...user.wallets],
       tokens: [...user.tokens],
+      subscriptions: [...user.subscriptions],
     });
   }
 

@@ -11,7 +11,7 @@ export class UserToken {
 
   @Column()
   @IsEthereumAddress()
-  address: string;
+  address: `0x${string}`;
 
   @Column({ enum: Network, default: Network.BSC })
   @IsEnum(Network)

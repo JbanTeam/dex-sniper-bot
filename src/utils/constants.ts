@@ -27,24 +27,54 @@ export const helpMessage = `
 /addtoken - Добавить токен, /addtoken [адрес_токена]
 /removetoken - Удалить токены, /removetoken [адрес_токена] - удалить токен
 /balance - Посмотреть баланс
-/my_subscribes - Посмотреть мои подписки
+/subscriptions - Посмотреть мои подписки
 `;
 
+// TODO: поменять ws rpc
 export const chains = (configService: ConfigService) => {
   return {
     [Network.BSC]: {
       name: 'Binance Smart Chain',
       rpcUrl: configService.get<string>('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/'),
+      rpcWsUrl: configService.get<string>('BSC_WS_RPC_URL', 'https://bsc-dataseed.binance.org/'),
       chain: bsc,
       nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+      exchange: 'PancakeSwap',
+      exchangeAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
     },
     [Network.POLYGON]: {
       name: 'Polygon',
       rpcUrl: configService.get<string>('POLYGON_RPC_URL', 'https://polygon-rpc.com/'),
+      rpcWsUrl: configService.get<string>('POLYGON_WS_RPC_URL', 'https://polygon-rpc.com/'),
       chain: polygon,
       nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+      exchange: 'Uniswap',
+      exchangeAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
     },
   };
+};
+
+export const isChainMonitoring = {
+  [Network.BSC]: false,
+  [Network.POLYGON]: false,
+};
+
+type ExchangesType = {
+  [key in Network]: {
+    exchangeAddress: `0x${string}`;
+    testAddress: `0x${string}`;
+  };
+};
+
+export const exchangeAddresses: ExchangesType = {
+  [Network.BSC]: {
+    exchangeAddress: `0x`,
+    testAddress: `0x`,
+  },
+  [Network.POLYGON]: {
+    exchangeAddress: `0x`,
+    testAddress: `0x`,
+  },
 };
 
 export const erc20Abi = parseAbi([
@@ -54,6 +84,9 @@ export const erc20Abi = parseAbi([
   'function balanceOf(address) view returns (uint256)',
   'function transfer(address to, uint256 value) returns (bool)',
 ]);
+
+export const erc20TransferEvent = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+export const pancakeSwapEvent = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822';
 
 export const anvilAbi = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',

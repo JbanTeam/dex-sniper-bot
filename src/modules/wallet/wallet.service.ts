@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Wallet } from './wallet.entity';
 import { Network } from '@src/types/types';
+import { Address } from 'viem';
 
 @Injectable()
 export class WalletService {
@@ -21,7 +22,7 @@ export class WalletService {
   }: {
     network: Network;
     encryptedPrivateKey: string;
-    address: string;
+    address: Address;
     userId: number;
     entityManager?: EntityManager;
   }): Promise<Wallet> {

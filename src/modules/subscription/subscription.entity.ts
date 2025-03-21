@@ -12,7 +12,7 @@ export class Subscription {
 
   @Column()
   @IsEthereumAddress()
-  address: string;
+  address: `0x${string}`;
 
   @Column({ enum: Network })
   @IsEnum(Network)

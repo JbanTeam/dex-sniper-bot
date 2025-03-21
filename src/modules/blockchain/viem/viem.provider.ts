@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { isEthereumAddress } from 'class-validator';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
@@ -11,27 +10,53 @@ import {
   formatEther,
   PublicClient,
   formatUnits,
-  parseEther,
+  webSocket,
+  Log,
 } from 'viem';
 
 import { AnvilProvider } from './anvil/anvil.provider';
-import { UserToken } from '@modules/user/user-token.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { encryptPrivateKey } from '@src/utils/crypto';
-import { chains, erc20Abi } from '@src/utils/constants';
-import { TestPuplicClient, ViemClientsType } from './types';
-import { Network, SessionData, UserTestToken } from '@src/types/types';
+import { chains, erc20Abi, erc20TransferEvent, isChainMonitoring } from '@src/utils/constants';
+import { Transaction, ViemClientsType } from './types';
+import { Network, SessionUserToken, UserTestToken } from '@src/types/types';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { isEtherAddressArr, isNetworkArr } from '@src/types/typeGuards';
 
 @Injectable()
-export class ViemProvider {
+export class ViemProvider implements OnModuleInit {
   private clients: ViemClientsType;
+  private anvilClients: ViemClientsType;
+  private unwatchCallbacks: { [key in Network]: () => void };
 
   constructor(
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly anvilProvider: AnvilProvider,
+    private readonly eventEmitter: EventEmitter2,
   ) {
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+
+    if (nodeEnv !== 'production') {
+      this.anvilClients = this.anvilProvider.createClients();
+    }
+
     this.clients = this.createClients();
+    this.unwatchCallbacks = {} as { [key in Network]: () => void };
+    Object.keys(chains(this.configService)).forEach(network => {
+      this.unwatchCallbacks[network] = () => {};
+    });
+  }
+
+  onModuleInit() {
+    const networkKeys = Object.keys(chains(this.configService));
+    isNetworkArr(networkKeys);
+
+    for (const network of networkKeys) {
+      this.monitorTokens({ network }).catch(error => {
+        console.error('Error monitoring tokens:', error);
+      });
+    }
   }
 
   async createWallet(network: Network) {
@@ -40,7 +65,7 @@ export class ViemProvider {
     const nodeEnv = this.configService.get<string>('NODE_ENV');
 
     if (nodeEnv !== 'production') {
-      await this.setTestBalance({ network, address: account.address });
+      await this.anvilProvider.setTestBalance({ network, address: account.address });
     }
 
     return {
@@ -64,6 +89,11 @@ export class ViemProvider {
           transport: http(value.rpcUrl),
         });
 
+        clients.publicWebsocket[keyNetwork] = createPublicClient({
+          chain: value.chain,
+          transport: webSocket(value.rpcUrl),
+        });
+
         clients.wallet[keyNetwork] = createWalletClient({
           chain: value.chain,
           transport: http(value.rpcUrl),
@@ -71,7 +101,7 @@ export class ViemProvider {
 
         return clients;
       },
-      { public: {}, wallet: {} } as ViemClientsType,
+      { public: {}, wallet: {}, publicWebsocket: {} } as ViemClientsType,
     );
   }
 
@@ -120,63 +150,40 @@ export class ViemProvider {
     address: Address;
     network: Network;
   }): Promise<string> {
-    if (!isEthereumAddress(address)) throw new Error('Неверный формат адреса');
-
-    const userSession = await this.redisService.getSessionData(chatId.toString());
-
-    if (!userSession) throw new Error('Пользователь не найден');
-
     try {
-      return await this.getFullBalance({ network, address, userSession });
+      const nodeEnv = this.configService.get<string>('NODE_ENV');
+      const networkClient = nodeEnv !== 'production' ? this.anvilClients.public[network] : this.clients.public[network];
+
+      const chain = chains(this.configService)[network];
+      const nativeBalance = await networkClient.getBalance({ address });
+      const formattedNativeBalance = formatEther(nativeBalance);
+      let tokens =
+        nodeEnv !== 'production'
+          ? (await this.redisService.getTestTokens(chatId)) || []
+          : (await this.redisService.getTokens(chatId)) || [];
+
+      tokens = tokens.filter(t => t.network === network);
+
+      let balanceReply = `<b>Адрес:</b> <code>${address}</code>\n`;
+      balanceReply += `<b>Сеть:</b> ${network}\n`;
+      balanceReply += `<b>${chain.nativeCurrency.symbol}:</b> ${formattedNativeBalance}\n`;
+
+      if (!tokens.some((t: SessionUserToken | UserTestToken) => t.network === network)) return balanceReply;
+
+      for (const token of tokens) {
+        const tokenBalance = await this.getTokenBalance({
+          tokenAddress: token.address,
+          walletAddress: address,
+          networkClient,
+        });
+        balanceReply += tokenBalance;
+      }
+
+      return balanceReply;
     } catch (error) {
       console.error(error);
       throw new Error(`Ошибка получения баланса`);
     }
-  }
-
-  private async getFullBalance({
-    network,
-    address,
-    userSession,
-  }: {
-    network: Network;
-    address: Address;
-    userSession: SessionData;
-  }): Promise<string> {
-    let balanceReply = '';
-    let networkClient: PublicClient | TestPuplicClient;
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-
-    if (nodeEnv !== 'production') {
-      networkClient = this.anvilProvider.createTestNetworkClient('public', network);
-    } else {
-      networkClient = this.clients.public[network];
-    }
-
-    const chain = chains(this.configService)[network];
-    const nativeBalance = await networkClient.getBalance({ address });
-    const formattedNativeBalance = formatEther(nativeBalance);
-
-    balanceReply += `<b>${chain.nativeCurrency.symbol}:</b> ${formattedNativeBalance}\n`;
-    let reply = `<b>Адрес:</b> <code>${address}</code>\n`;
-    reply += `<b>Сеть:</b> ${network}\n`;
-
-    let tokens: (UserToken | UserTestToken)[] | undefined;
-    tokens = nodeEnv !== 'production' ? userSession.testTokens : userSession.tokens;
-    tokens = tokens?.filter(t => t.network === network);
-
-    if (!tokens?.length) return (reply += balanceReply);
-
-    for (const token of tokens) {
-      const tokenBalance = await this.getTokenBalance({
-        tokenAddress: token.address as Address,
-        walletAddress: address,
-        networkClient,
-      });
-      balanceReply += tokenBalance;
-    }
-
-    return (reply += balanceReply);
   }
 
   private async getTokenBalance({
@@ -186,7 +193,7 @@ export class ViemProvider {
   }: {
     tokenAddress: Address;
     walletAddress: Address;
-    networkClient: PublicClient | TestPuplicClient;
+    networkClient: PublicClient;
   }): Promise<string> {
     const [balance, symbol, decimals] = await Promise.all([
       networkClient.readContract({
@@ -204,19 +211,93 @@ export class ViemProvider {
     return `<b>${symbol}:</b> ${formattedBalance}\n`;
   }
 
-  async setTestBalance({ network, address }: { network: Network; address: Address }) {
-    if (!isEthereumAddress(address)) throw new Error('Неверный формат адреса');
+  @OnEvent('monitorTokens')
+  async monitorTokens({ network }: { network: Network }): Promise<void> {
+    console.log(`${network} enter monitorTokens`);
 
-    try {
-      const client = this.anvilProvider.createTestNetworkClient('public', network);
-
-      await client.request({
-        method: 'anvil_setBalance',
-        params: [address, `0x${parseEther('1000').toString(16)}`],
-      });
-    } catch (error) {
-      console.error(error);
-      throw new Error(`Ошибка установления баланса`);
+    const canMonitoringChain = await this.canMonitoringChain(network);
+    console.log(`${network} canMonitoringChain`, canMonitoringChain);
+    if (!canMonitoringChain) {
+      isChainMonitoring[network] = false;
+      this.unwatchCallbacks[network]();
+      return;
     }
+
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    const tokensAddresses =
+      nodeEnv !== 'production'
+        ? await this.redisService.getTestTokensSet(network)
+        : await this.redisService.getTokensSet(network);
+    const client =
+      nodeEnv !== 'production' ? this.anvilClients.publicWebsocket[network] : this.clients.publicWebsocket[network];
+
+    isEtherAddressArr(tokensAddresses);
+
+    console.log(`${network}:tokensAddresses`, tokensAddresses);
+
+    if (this.unwatchCallbacks[network]) this.unwatchCallbacks[network]();
+
+    this.unwatchCallbacks[network] = client.watchEvent({
+      address: tokensAddresses,
+      onLogs: (logs: Log[]) => {
+        console.log(logs[0].topics);
+        Promise.all(
+          logs.map(async log => {
+            this.eventEmitter.emit('handleTransaction', { tx: this.parseTransactionLog(log, network) });
+          }),
+        ).catch(error => {
+          console.error('Error processing logs:', error);
+        });
+      },
+    });
+
+    isChainMonitoring[network] = true;
+  }
+
+  async stopMonitoring() {
+    Object.values(this.unwatchCallbacks).forEach(unwatch => unwatch());
+  }
+
+  private parseTransactionLog(log: Log, network: Network): Transaction | null {
+    try {
+      if (log.topics[0] === erc20TransferEvent) {
+        const decimals = 18;
+
+        return {
+          hash: log.transactionHash ? log.transactionHash : `0x`,
+          from: log.topics[1] ? this.decodeAddress(log.topics[1]) : `0x`,
+          to: log.topics[2] ? this.decodeAddress(log.topics[2]) : `0x`,
+          contractAddress: log.address,
+          value: formatUnits(BigInt(log.data), decimals),
+          data: log.data,
+          network,
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error parsing transaction log:', error);
+      return null;
+    }
+  }
+
+  private async canMonitoringChain(network: Network): Promise<boolean> {
+    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    const arr: Promise<boolean>[] = [];
+
+    arr.push(this.redisService.isSetEmpty(`subscriptions:${network}`));
+    if (nodeEnv !== 'production') {
+      arr.push(this.redisService.isSetEmpty(`testTokens:${network}`));
+    } else {
+      arr.push(this.redisService.isSetEmpty(`tokens:${network}`));
+    }
+
+    const [isTokensEmpty, isSubscriptionsEmpty] = await Promise.all(arr);
+
+    return !isTokensEmpty && !isSubscriptionsEmpty;
+  }
+
+  private decodeAddress(topic: `0x${string}`): `0x${string}` {
+    return `0x${topic.slice(26)}`;
   }
 }

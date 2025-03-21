@@ -1,13 +1,13 @@
-import { Address } from 'viem';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { isEthereumAddress } from 'class-validator';
 
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { chains, helpMessage, startMessage } from '@src/utils/constants';
 import { IncomingMessage, SendMessageOptions } from '@src/types/types';
+import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { chains, helpMessage, startMessage } from '@src/utils/constants';
+import { isEtherAddress } from '@src/types/typeGuards';
 
 @Injectable()
 export class CommandHandler {
@@ -15,6 +15,7 @@ export class CommandHandler {
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
+    private readonly subscriptionService: SubscriptionService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -24,14 +25,22 @@ export class CommandHandler {
     switch (true) {
       case command.startsWith('/start'):
         return { text: startMessage };
-      case command.startsWith('/help'):
-        return { text: helpMessage };
       case command.startsWith('/addtoken'):
         return this.addToken(message);
       case command.startsWith('/removetoken'):
         return this.removeToken(message);
       case command.startsWith('/balance'):
         return this.getBalance(message);
+      case command.startsWith('/follow'):
+        return this.subscribe(message);
+      case command.startsWith('/unfollow'):
+        return this.unsubscribe(message);
+      case command.startsWith('/subscriptions'):
+        return this.getSubscriptions(message);
+      case command.startsWith('/faketransaction'):
+        return this.sendFakeTransaction(message);
+      case command.startsWith('/help'):
+        return { text: helpMessage };
       default:
         return { text: 'Неизвестная команда. Попробуйте /help.' };
     }
@@ -41,18 +50,13 @@ export class CommandHandler {
     const [, tokenAddress] = message.text.split(' ');
 
     try {
-      const userSession = await this.redisService.getSessionData(message.chatId.toString());
+      const userId = await this.redisService.getUserId(message.chatId);
 
-      if (!userSession) throw new Error('Пользователь не найден');
+      if (!userId) throw new Error('Пользователь не найден');
 
-      if (!tokenAddress || !isEthereumAddress(tokenAddress)) {
-        throw new Error('Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
-      }
+      isEtherAddress(tokenAddress, 'Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
 
-      await this.redisService.setSessionData(message.chatId.toString(), {
-        ...userSession,
-        tempToken: tokenAddress,
-      });
+      await this.redisService.setUserField(message.chatId, 'tempToken', tokenAddress);
 
       const chainsArr = Object.entries(chains(this.configService));
       const keardboard = chainsArr.map(([keyNetwork, value]) => {
@@ -73,25 +77,20 @@ export class CommandHandler {
   }
 
   private async removeToken(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
-    const [, tokenAddress] = message.text.split(' ');
-
     try {
-      const userSession = await this.redisService.getSessionData(message.chatId.toString());
-
-      if (!userSession) throw new Error('Пользователь не найден');
+      const [, tokenAddress] = message.text.split(' ');
+      const userSession = await this.redisService.getUser(message.chatId);
 
       if (!userSession.tokens?.length) {
         throw new Error('У вас нет сохраненных токенов');
       }
 
       if (tokenAddress) {
-        const deletedToken = await this.userService.removeToken({
-          userId: userSession.userId,
+        isEtherAddress(tokenAddress);
+        await this.userService.removeToken({
           chatId: userSession.chatId,
-          address: tokenAddress as Address,
+          address: tokenAddress,
         });
-
-        if (!deletedToken.affected) throw new Error('Токен не найден');
 
         return { text: 'Токен успешно удален 🔥' };
       }
@@ -115,35 +114,111 @@ export class CommandHandler {
     }
   }
 
-  private async getBalance(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
-    const [, walletAddress] = message.text.split(' ');
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-
+  private async subscribe(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     try {
-      const userSession = await this.redisService.getSessionData(message.chatId.toString());
-      if (!userSession) throw new Error('Пользователь не найден');
+      const [, walletAddress] = message.text.split(' ');
 
-      // TODO: может лучше устанавливать тестовый баланс при добавлении пользователя в сессию
+      isEtherAddress(walletAddress, 'Введите корректный адрес кошелька. Пример: /follow [адрес_кошелька]');
+
+      await this.redisService.setUserField(message.chatId, 'tempWallet', walletAddress);
+
+      const chainsArr = Object.entries(chains(this.configService));
+      const keardboard = chainsArr.map(([keyNetwork, value]) => {
+        return [{ text: `${value.exchange} (${keyNetwork})`, callback_data: `sub-${keyNetwork}` }];
+      });
+
+      return {
+        text: 'Выберите обменник, на котором вы хотите отслеживать транзакции данного кошелька:',
+        options: {
+          parse_mode: 'html',
+          reply_markup: { inline_keyboard: keardboard },
+        },
+      };
+    } catch (error) {
+      console.log(`Error while subscribing to address: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async unsubscribe(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, walletAddress] = message.text.split(' ');
+
+      isEtherAddress(walletAddress, 'Введите корректный адрес кошелька. Пример: /follow [адрес_кошелька]');
+
+      await this.subscriptionService.unsubscribeFromWallet({
+        chatId: message.chatId,
+        walletAddress,
+      });
+
+      return {
+        text: 'Вы успешно отписались от кошелька ✅',
+        options: {
+          parse_mode: 'html',
+        },
+      };
+    } catch (error) {
+      console.log(`Error while subscribing to address: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async getSubscriptions(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const reply = await this.subscriptionService.getSubscriptions(message.chatId);
+
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      console.log(`Error while getting subscriptions: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async getBalance(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, walletAddress] = message.text.split(' ');
+      const nodeEnv = this.configService.get<string>('NODE_ENV');
+      const wallets = await this.redisService.getWallets(message.chatId);
+
       if (walletAddress && nodeEnv !== 'production') {
-        const wallet = userSession.wallets?.find(wallet => wallet.address === walletAddress);
+        const wallet = wallets?.find(wallet => wallet.address === walletAddress);
         if (!wallet) throw new Error('Кошелек не найден');
 
         const balance = await this.blockchainService.setTestBalance({
           chatId: message.chatId,
-          network: wallet?.network,
-          address: wallet.address as Address,
+          network: wallet.network,
+          address: wallet.address,
         });
 
         return { text: balance, options: { parse_mode: 'html' } };
       }
 
-      const keyboard = userSession.wallets?.map(wallet => {
+      const keyboard = wallets?.map(wallet => {
         return [{ text: `${wallet.network}: ${wallet.address}`, callback_data: `balance-${wallet.id}` }];
       });
 
       return { text: 'Выберите кошелек:', options: { reply_markup: { inline_keyboard: keyboard } } };
     } catch (error) {
       console.log(`Error while removing token: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async sendFakeTransaction(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const testTokens = await this.redisService.getTestTokens(message.chatId);
+
+      if (!testTokens || !testTokens?.length) {
+        throw new Error('У вас нет токенов, чтобы отправить транзакцию');
+      }
+      const contractAddress = testTokens[0].address;
+
+      if (!contractAddress) throw new Error('Токен не найден');
+      await this.blockchainService.sendFakeTransaction(contractAddress);
+
+      return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
+    } catch (error) {
+      console.log(`Error while sending fake transaction: ${error.message}`);
       return { text: `${error.message}` };
     }
   }

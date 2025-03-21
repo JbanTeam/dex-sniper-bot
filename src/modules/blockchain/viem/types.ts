@@ -1,8 +1,6 @@
-import { Address, publicActions, PublicClient, TestClient, walletActions, WalletClient } from 'viem';
+import { Address, PublicClient, WalletClient } from 'viem';
 
-import { Network } from '@src/types/types';
-import { UserToken } from '@modules/user/user-token.entity';
-import { Wallet } from '@modules/wallet/wallet.entity';
+import { Network, SessionUserToken } from '@src/types/types';
 
 type ViemClientsType = {
   public: {
@@ -11,33 +9,15 @@ type ViemClientsType = {
   wallet: {
     [key in Network]: WalletClient;
   };
-  test?: TestClient;
+  publicWebsocket: {
+    [key in Network]: PublicClient;
+  };
 };
-
-type TestPuplicClient = TestClient & ReturnType<typeof publicActions>;
-type TestWalletClient = TestClient & ReturnType<typeof walletActions>;
 
 type DeployTestContractParams = {
-  name: string;
-  symbol: string;
-  decimals: number;
+  token: SessionUserToken;
   count?: string;
-  network: Network;
   walletAddress: Address;
-};
-
-type SaveTestTokensParams = {
-  wallets: Wallet[];
-  network: Network;
-  name: string;
-  symbol: string;
-  decimals: number;
-};
-
-type CreateTestTokensParams = {
-  wallets: Wallet[];
-  tokens: UserToken[];
-  chatId?: number;
 };
 
 type TestBalanceParams = {
@@ -54,13 +34,14 @@ type SendTestTokenParams = {
   decimals: number;
 };
 
-export {
-  ViemClientsType,
-  TestPuplicClient,
-  TestWalletClient,
-  CreateTestTokensParams,
-  DeployTestContractParams,
-  TestBalanceParams,
-  SendTestTokenParams,
-  SaveTestTokensParams,
+type Transaction = {
+  hash: Address;
+  from: Address;
+  to: Address;
+  contractAddress: Address;
+  value: string;
+  data: string;
+  network: Network;
 };
+
+export { ViemClientsType, DeployTestContractParams, TestBalanceParams, SendTestTokenParams, Transaction };

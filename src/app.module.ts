@@ -6,6 +6,7 @@ import { databaseConfig } from './config/database.config';
 import { UserModule } from './modules/user/user.module';
 import { RedisModule } from './modules/redis/redis.module';
 import { BotModule } from '@modules/bot-providers/bot.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 const envPath =
   process.env.NODE_ENV === 'development' ? '.env.dev' : process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
@@ -13,6 +14,7 @@ const envPath =
 @Module({
   imports: [
     ConfigModule.forRoot({ envFilePath: envPath, isGlobal: true }),
+    EventEmitterModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

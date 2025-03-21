@@ -9,9 +9,10 @@ import { BotProvider } from './bot.provider';
 import { CommandHandler } from './telegram/utils/command-handler';
 import { MessageHandler } from './telegram/utils/message-handler';
 import { QueryHandler } from './telegram/utils/query-handler';
+import { SubscriptionModule } from '@modules/subscription/subscription.module';
 
 @Module({
-  imports: [UserModule, RedisModule, BlockchainModule],
+  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule],
   providers: [
     BotService,
     BotProvider,

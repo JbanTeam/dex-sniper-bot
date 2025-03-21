@@ -15,7 +15,7 @@ export class Wallet {
 
   @Column()
   @IsEthereumAddress()
-  address: string;
+  address: `0x${string}`;
 
   @Column()
   @IsString()

@@ -2,6 +2,7 @@ import { Address } from 'viem';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
+import { Subscription } from '@modules/subscription/subscription.entity';
 
 export interface BotProviderInterface {
   sendMessage({
@@ -58,16 +59,29 @@ export enum Network {
 }
 
 export interface SessionData {
-  tempToken?: string;
-  tempNetwork?: Network;
   userId: number;
   chatId: number;
   telegramUserId: number;
-  wallets: Wallet[];
-  tokens?: UserToken[];
-  testTokens?: UserTestToken[];
+  wallets: SessionWallet[];
+  tokens: SessionUserToken[];
+  testTokens?: SessionUserToken[];
+  subscriptions: SessionSubscription[];
   action?: string;
+  tempToken?: string;
+  tempWallet?: string;
+  tempNetwork?: Network;
 }
+
+export type SessionUserToken = Omit<UserToken, 'user'>;
+export type SessionWallet = Omit<Wallet, 'user'>;
+export type SessionSubscription = Omit<Subscription, 'user'>;
+
+export type NewAddedTokenParams = {
+  chatId: number;
+  tokens: SessionUserToken[];
+  token: SessionUserToken;
+  isTest?: boolean;
+};
 
 export type UserTestToken = {
   address: Address;
