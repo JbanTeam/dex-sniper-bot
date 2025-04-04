@@ -6,9 +6,9 @@ import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { BotService } from './bot.service';
 import { TelegramBot } from './telegram/telegram-bot';
 import { BotProvider } from './bot.provider';
-import { CommandHandler } from './telegram/utils/command-handler';
-import { MessageHandler } from './telegram/utils/message-handler';
-import { QueryHandler } from './telegram/utils/query-handler';
+import { CommandHandler } from './telegram/handlers/command-handler';
+import { MessageHandler } from './telegram/handlers/message-handler';
+import { QueryHandler } from './telegram/handlers/query-handler';
 import { SubscriptionModule } from '@modules/subscription/subscription.module';
 
 @Module({

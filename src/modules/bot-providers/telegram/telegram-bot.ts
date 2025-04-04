@@ -5,8 +5,8 @@ import { RedisService } from '@modules/redis/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { UserService } from '@modules/user/user.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { isCallbackQueryUpdate, isMessageUpdate } from './utils/utils';
-import { CallbackQuery, Message, TelegramUpdateResponse } from './utils/types';
+import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
+import { CallbackQuery, Message, TelegramUpdateResponse } from './types/types';
 import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
 
 @Injectable()
@@ -129,6 +129,7 @@ export class TelegramBot implements BotProviderInterface {
       { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
       { command: 'follow', description: 'Подписаться на кошелек, /follow [адрес_кошелька]' },
       { command: 'unfollow', description: 'Отписаться от кошелька, /unfollow [адрес_кошелька]' },
+      { command: 'replicate', description: 'Установить какие сделки повторять, /replicate [buy/sell] [лимит суммы]' },
       { command: 'balance', description: 'Посмотреть баланс' },
       { command: 'subscriptions', description: 'Посмотреть мои подписки' },
     ];

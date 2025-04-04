@@ -69,7 +69,7 @@ export interface SessionData {
   action?: string;
   tempToken?: string;
   tempWallet?: string;
-  tempNetwork?: Network;
+  tempReplication?: string;
 }
 
 export type SessionUserToken = Omit<UserToken, 'user'>;
@@ -81,14 +81,6 @@ export type NewAddedTokenParams = {
   tokens: SessionUserToken[];
   token: SessionUserToken;
   isTest?: boolean;
-};
-
-export type UserTestToken = {
-  address: Address;
-  network: Network;
-  name: string;
-  symbol: string;
-  decimals: number;
 };
 
 export type DeleteConditions = {

@@ -31,6 +31,7 @@ export const helpMessage = `
 `;
 
 // TODO: поменять ws rpc
+// TODO: проверить exchangeAddress
 export const chains = (configService: ConfigService) => {
   return {
     [Network.BSC]: {

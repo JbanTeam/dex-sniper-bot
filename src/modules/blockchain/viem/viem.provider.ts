@@ -19,7 +19,7 @@ import { RedisService } from '@modules/redis/redis.service';
 import { encryptPrivateKey } from '@src/utils/crypto';
 import { chains, erc20Abi, erc20TransferEvent, isChainMonitoring } from '@src/utils/constants';
 import { Transaction, ViemClientsType } from './types';
-import { Network, SessionUserToken, UserTestToken } from '@src/types/types';
+import { Network, SessionUserToken } from '@src/types/types';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { isEtherAddressArr, isNetworkArr } from '@src/types/typeGuards';
 
@@ -168,7 +168,7 @@ export class ViemProvider implements OnModuleInit {
       balanceReply += `<b>Сеть:</b> ${network}\n`;
       balanceReply += `<b>${chain.nativeCurrency.symbol}:</b> ${formattedNativeBalance}\n`;
 
-      if (!tokens.some((t: SessionUserToken | UserTestToken) => t.network === network)) return balanceReply;
+      if (!tokens.some((t: SessionUserToken) => t.network === network)) return balanceReply;
 
       for (const token of tokens) {
         const tokenBalance = await this.getTokenBalance({

@@ -7,7 +7,8 @@ import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { IncomingMessage, SendMessageOptions } from '@src/types/types';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { chains, helpMessage, startMessage } from '@src/utils/constants';
-import { isEtherAddress } from '@src/types/typeGuards';
+import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
+import { strIsPositiveNumber } from '@src/utils/utils';
 
 @Injectable()
 export class CommandHandler {
@@ -35,6 +36,8 @@ export class CommandHandler {
         return this.subscribe(message);
       case command.startsWith('/unfollow'):
         return this.unsubscribe(message);
+      case command.startsWith('/replicate'):
+        return this.replicate(message);
       case command.startsWith('/subscriptions'):
         return this.getSubscriptions(message);
       case command.startsWith('/faketransaction'):
@@ -124,7 +127,7 @@ export class CommandHandler {
 
       const chainsArr = Object.entries(chains(this.configService));
       const keardboard = chainsArr.map(([keyNetwork, value]) => {
-        return [{ text: `${value.exchange} (${keyNetwork})`, callback_data: `sub-${keyNetwork}` }];
+        return [{ text: `${value.exchange} (${keyNetwork})`, callback_data: `subnet-${keyNetwork}` }];
       });
 
       return {
@@ -158,7 +161,7 @@ export class CommandHandler {
         },
       };
     } catch (error) {
-      console.log(`Error while subscribing to address: ${error.message}`);
+      console.log(`Error while unsubscribing from address: ${error.message}`);
       return { text: `${error.message}` };
     }
   }
@@ -174,12 +177,43 @@ export class CommandHandler {
     }
   }
 
+  private async replicate(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, action, limit] = message.text.split(' ');
+
+      if (!strIsPositiveNumber(limit)) throw new Error('Введите корректную команду. Пример: /replicate buy 100');
+
+      isBuySell(action);
+
+      await this.redisService.setUserField(message.chatId, 'tempReplication', `${action}:${limit}`);
+
+      const subscriptions = await this.redisService.getSubscriptions(message.chatId);
+
+      if (!subscriptions?.length) {
+        throw new Error('У вас нет подписок на кошельки');
+      }
+
+      const keyboard = subscriptions.map(sub => {
+        return [{ text: `${sub.network}: ${sub.address}`, callback_data: `sub-${sub.id}` }];
+      });
+
+      return {
+        text: 'Выберите адрес подписки для установки параметров:',
+        options: { reply_markup: { inline_keyboard: keyboard } },
+      };
+    } catch (error) {
+      console.log(`Error while subscribing to address: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
   private async getBalance(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     try {
       const [, walletAddress] = message.text.split(' ');
       const nodeEnv = this.configService.get<string>('NODE_ENV');
       const wallets = await this.redisService.getWallets(message.chatId);
 
+      // TODO: ?
       if (walletAddress && nodeEnv !== 'production') {
         const wallet = wallets?.find(wallet => wallet.address === walletAddress);
         if (!wallet) throw new Error('Кошелек не найден');

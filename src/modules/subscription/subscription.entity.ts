@@ -18,6 +18,12 @@ export class Subscription {
   @IsEnum(Network)
   network: Network;
 
+  @Column({ default: 0 })
+  buy: number;
+
+  @Column({ default: 0 })
+  sell: number;
+
   @ManyToOne(() => User, user => user.subscriptions, { onDelete: 'CASCADE' })
   user: User;
 

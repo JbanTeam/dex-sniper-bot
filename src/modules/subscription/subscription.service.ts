@@ -179,6 +179,43 @@ export class SubscriptionService {
     }
   }
 
+  // TODO: вынести в types
+  async updateSubscription({
+    chatId,
+    subscription,
+    action,
+    limit,
+  }: {
+    chatId: number;
+    subscription: Subscription;
+    action: 'buy' | 'sell';
+    limit: number;
+  }) {
+    const updatedSubscription = await this.subscriptionRepository.update(subscription.id, { [action]: limit });
+    if (!updatedSubscription.affected) throw new Error('Error updating subscription');
+
+    subscription[action] = limit;
+    const sessionSubscription = { ...subscription, user: undefined };
+    delete sessionSubscription.user;
+    const subscriptions = await this.redisService.getSubscriptions(chatId);
+
+    if (!subscriptions?.length) {
+      throw new Error('Вы не подписаны ни на один кошелек');
+    }
+
+    await this.redisService.updateSubscription({
+      chatId,
+      subscription: sessionSubscription,
+      subscriptions,
+    });
+  }
+
+  async findById({ id }: { id: number }) {
+    return await this.subscriptionRepository.findOne({
+      where: { id },
+    });
+  }
+
   private async findByUserId({ userId, address, network }: { userId: number; address: Address; network: Network }) {
     return await this.subscriptionRepository.findOne({
       where: {

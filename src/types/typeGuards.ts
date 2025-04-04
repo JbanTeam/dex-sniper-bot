@@ -18,6 +18,12 @@ function isNetworkArr(networks: string[]): asserts networks is Network[] {
   for (const network of networks) isNetwork(network);
 }
 
+function isBuySell(action: string): asserts action is 'buy' | 'sell' {
+  if (!action || (action !== 'buy' && action !== 'sell')) {
+    throw new Error('Введите корректную команду. Пример: /replicate buy 100');
+  }
+}
+
 function isValidRemoveQueryData(network: string): asserts network is Network | 'all' {
   const possibleNetworks: (Network | 'all')[] = Object.values(Network);
   possibleNetworks.push('all');
@@ -26,4 +32,4 @@ function isValidRemoveQueryData(network: string): asserts network is Network | '
   }
 }
 
-export { isEtherAddress, isEtherAddressArr, isNetwork, isNetworkArr, isValidRemoveQueryData };
+export { isEtherAddress, isEtherAddressArr, isNetwork, isNetworkArr, isBuySell, isValidRemoveQueryData };

@@ -6,7 +6,7 @@ import { UserService } from '@modules/user/user.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { IncomingQuery, SendMessageOptions } from '@src/types/types';
-import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
+import { isBuySell, isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 
 @Injectable()
 export class QueryHandler {
@@ -26,8 +26,10 @@ export class QueryHandler {
         return this.removeTokenCb(query);
       case /^balance-(.+)/.test(query.data):
         return this.getBalanceCb(query);
-      case /^sub-(.+)/.test(query.data):
+      case /^subnet-(.+)/.test(query.data):
         return this.subscribeCb(query);
+      case /^sub-(.+)/.test(query.data):
+        return this.replicateCb(query);
       default:
         return { text: 'Неизвестная команда' };
     }
@@ -130,6 +132,34 @@ export class QueryHandler {
       return { text: `Кошелек добавлен в список для отслеживания ✅`, options: { parse_mode: 'html' } };
     } catch (error) {
       console.log(`Error while adding wallet to subscription list: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async replicateCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, subscriptionId] = query.data.split('-');
+
+      const tempReplication = await this.redisService.getTempReplication(query.chatId);
+      if (!tempReplication) throw new Error('Не удалось установить повтор сделок');
+
+      const [action, limit] = tempReplication.split(':');
+      isBuySell(action);
+
+      const subscription = await this.subscriptionService.findById({ id: +subscriptionId });
+
+      if (!subscription) throw new Error('Подписка не найдена');
+
+      await this.subscriptionService.updateSubscription({
+        chatId: query.chatId,
+        subscription,
+        action: action,
+        limit: +limit,
+      });
+
+      return { text: `Параметры повтора сделок установлены ✅`, options: { parse_mode: 'html' } };
+    } catch (error) {
+      console.log(`Error while setting replication params: ${error.message}`);
       return { text: `${error.message}` };
     }
   }
