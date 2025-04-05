@@ -32,6 +32,7 @@ export const helpMessage = `
 
 // TODO: поменять ws rpc
 // TODO: проверить exchangeAddress
+// TODO: переделать чтобы не вызывать каждый раз функцию
 export const chains = (configService: ConfigService) => {
   return {
     [Network.BSC]: {
@@ -39,7 +40,12 @@ export const chains = (configService: ConfigService) => {
       rpcUrl: configService.get<string>('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/'),
       rpcWsUrl: configService.get<string>('BSC_WS_RPC_URL', 'https://bsc-dataseed.binance.org/'),
       chain: bsc,
-      nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+      nativeCurrency: {
+        name: 'BNB',
+        symbol: 'BNB',
+        decimals: 18,
+        address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+      },
       exchange: 'PancakeSwap',
       exchangeAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
     },
@@ -48,7 +54,12 @@ export const chains = (configService: ConfigService) => {
       rpcUrl: configService.get<string>('POLYGON_RPC_URL', 'https://polygon-rpc.com/'),
       rpcWsUrl: configService.get<string>('POLYGON_WS_RPC_URL', 'https://polygon-rpc.com/'),
       chain: polygon,
-      nativeCurrency: { name: 'MATIC', symbol: 'MATIC', decimals: 18 },
+      nativeCurrency: {
+        name: 'POL',
+        symbol: 'POL',
+        decimals: 18,
+        address: '0x455e53CBB86018Ac2B8092FdCd39d8444AFFC3F6',
+      },
       exchange: 'Uniswap',
       exchangeAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
     },
@@ -78,6 +89,7 @@ export const exchangeAddresses: ExchangesType = {
   },
 };
 
+// TODO: нужно ли добавить event transfer
 export const erc20Abi = parseAbi([
   'function name() view returns (string)',
   'function symbol() view returns (string)',

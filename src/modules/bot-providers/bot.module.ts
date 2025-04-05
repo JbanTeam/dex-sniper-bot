@@ -10,9 +10,10 @@ import { CommandHandler } from './telegram/handlers/command-handler';
 import { MessageHandler } from './telegram/handlers/message-handler';
 import { QueryHandler } from './telegram/handlers/query-handler';
 import { SubscriptionModule } from '@modules/subscription/subscription.module';
+import { WalletModule } from '@modules/wallet/wallet.module';
 
 @Module({
-  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule],
+  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule, WalletModule],
   providers: [
     BotService,
     BotProvider,

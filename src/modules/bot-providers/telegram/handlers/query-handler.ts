@@ -5,6 +5,8 @@ import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { WalletService } from '@modules/wallet/wallet.service';
+import { strIsPositiveNumber } from '@src/utils/utils';
 import { IncomingQuery, SendMessageOptions } from '@src/types/types';
 import { isBuySell, isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 
@@ -15,6 +17,7 @@ export class QueryHandler {
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly walletService: WalletService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -30,6 +33,8 @@ export class QueryHandler {
         return this.subscribeCb(query);
       case /^sub-(.+)/.test(query.data):
         return this.replicateCb(query);
+      case /^send-(.+)/.test(query.data):
+        return this.sendTokensCb(query);
       default:
         return { text: 'Неизвестная команда' };
     }
@@ -132,6 +137,42 @@ export class QueryHandler {
       return { text: `Кошелек добавлен в список для отслеживания ✅`, options: { parse_mode: 'html' } };
     } catch (error) {
       console.log(`Error while adding wallet to subscription list: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
+  private async sendTokensCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, network] = query.data.split('-');
+      if (!network) throw new Error('Сеть не найдена');
+
+      const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
+
+      if (!tempSendTokens) throw new Error('Ошибка отправки токенов');
+      const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
+
+      isNetwork(network);
+      isEtherAddress(tokenAddress);
+      isEtherAddress(recipientAddress);
+      if (!strIsPositiveNumber(amount)) throw new Error('Введите корректное количество токенов');
+
+      const userSession = await this.redisService.getUser(query.chatId);
+      const wallet = userSession.wallets.find(wallet => wallet.network === network);
+      if (!wallet) throw new Error('Кошелек не найден');
+
+      const fullWallet = await this.walletService.findByAddress(wallet.address);
+      if (!fullWallet) throw new Error('Кошелек не найден');
+
+      await this.blockchainService.sendTokens({
+        wallet: fullWallet,
+        tokenAddress,
+        amount,
+        recipientAddress,
+      });
+
+      return { text: `Токены успешно отправлены ✅`, options: { parse_mode: 'html' } };
+    } catch (error) {
+      console.log(`Error while sending tokens: ${error.details}`);
       return { text: `${error.message}` };
     }
   }

@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { ConfigService } from '@nestjs/config';
+import { Hex } from 'viem';
 
 const encryptPrivateKey = ({
   privateKey,
@@ -29,7 +30,7 @@ const decryptPrivateKey = ({
 }: {
   encryptedPrivateKey: string;
   configService: ConfigService;
-}): string => {
+}): Hex => {
   const [ivHex, encryptedHex] = encryptedPrivateKey.split(':');
 
   if (!ivHex || !encryptedHex) {
@@ -47,7 +48,7 @@ const decryptPrivateKey = ({
   let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
   decrypted += decipher.final('utf8');
 
-  return decrypted;
+  return decrypted as Hex;
 };
 
 export { encryptPrivateKey, decryptPrivateKey };

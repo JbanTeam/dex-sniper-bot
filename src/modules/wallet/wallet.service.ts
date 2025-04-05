@@ -36,4 +36,8 @@ export class WalletService {
 
     return manager.save(wallet);
   }
+
+  async findByAddress(address: Address): Promise<Wallet | null> {
+    return this.walletRepository.findOne({ where: { address } });
+  }
 }

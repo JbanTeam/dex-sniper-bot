@@ -18,8 +18,14 @@ import {
 
 import { coinContract } from './coin-contract';
 import { Network, SessionUserToken } from '@src/types/types';
-import { anvilAbi, chains, exchangeAddresses } from '@src/utils/constants';
-import { TestBalanceParams, SendTestTokenParams, DeployTestContractParams, ViemClientsType } from '../types';
+import { anvilAbi, chains } from '@src/utils/constants';
+import {
+  TestBalanceParams,
+  SendTestTokenParams,
+  DeployTestContractParams,
+  ViemClientsType,
+  DeployContractParams,
+} from '../types';
 
 @Injectable()
 export class AnvilProvider {
@@ -60,14 +66,9 @@ export class AnvilProvider {
           transport: webSocket(rpcWsUrl),
         });
 
-        clients.wallet[keyNetwork] = createWalletClient({
-          chain: value.chain,
-          transport: http(rpcUrl),
-        });
-
         return clients;
       },
-      { public: {}, wallet: {}, publicWebsocket: {} } as ViemClientsType,
+      { public: {}, publicWebsocket: {} } as ViemClientsType,
     );
   }
 
@@ -89,27 +90,15 @@ export class AnvilProvider {
     };
   }
 
-  // TODO: types
-  private async deployContract({
-    name,
-    symbol,
-    decimals,
-    count,
-  }: {
-    name: string;
-    symbol: string;
-    decimals: number;
-    count: string;
-  }): Promise<{
+  private async deployContract({ name, symbol, decimals, count }: DeployContractParams): Promise<{
     testAccount: Address;
     contractAddress: Address;
   }> {
-    const [testAccount, secondAccount] = await this.walletClient.getAddresses();
+    const [testAccount] = await this.walletClient.getAddresses();
     // TODO: ?
-    exchangeAddresses[Network.BSC].exchangeAddress = testAccount;
-    exchangeAddresses[Network.BSC].testAddress = secondAccount;
+    // exchangeAddresses[Network.BSC].exchangeAddress = testAccount;
+    // exchangeAddresses[Network.BSC].testAddress = secondAccount;
 
-    await this.walletClient.getAddresses();
     const txHash = await this.walletClient.deployContract({
       abi: coinContract.abi,
       chain: anvil,
@@ -168,14 +157,14 @@ export class AnvilProvider {
     console.log('✅ Токены отправлены', receipt);
   }
 
-  async sendFakeTransaction(contractAddress: Address) {
+  async sendFakeTransaction(testToken: SessionUserToken) {
     const [pancakeAddress, secondAccount] = await this.walletClient.getAddresses();
     // const pancakeAddress = exchangeAddresses[Network.BSC].exchangeAddress;
     // const secondAccount = exchangeAddresses[Network.BSC].testAddress;
-    // TODO: ?
-    const amount = parseUnits('1000.0', 18);
+
+    const amount = parseUnits('1000.0', testToken.decimals);
     const hash = await this.walletClient.writeContract({
-      address: contractAddress,
+      address: testToken.address,
       abi: anvilAbi,
       chain: anvil,
       functionName: 'transfer',
@@ -194,19 +183,20 @@ export class AnvilProvider {
     console.log('✅ Токены отправлены', receipt);
 
     await this.getBalance({
-      contractAddress,
+      contractAddress: testToken.address,
       testAccount: secondAccount,
-      name: 'PancakeSwap',
-      decimals: 18,
+      name: testToken.name,
+      decimals: testToken.decimals,
     });
   }
 
   async setTestBalance({ network, address }: { network: Network; address: Address }) {
     try {
+      const rpcUrl = this.configService.get<string>(`ANVIL_RPC_URL`, 'http://dex_sniper-anvil:8545');
       const client = createTestClient({
         mode: 'anvil',
         chain: chains(this.configService)[network].chain,
-        transport: http('http://dex_sniper-anvil:8545'),
+        transport: http(rpcUrl),
       }).extend(publicActions);
 
       await client.request({

@@ -70,6 +70,7 @@ export interface SessionData {
   tempToken?: string;
   tempWallet?: string;
   tempReplication?: string;
+  tempSendTokens?: string;
 }
 
 export type SessionUserToken = Omit<UserToken, 'user'>;

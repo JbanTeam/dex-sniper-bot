@@ -1,5 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { anvil } from 'viem/chains';
 import { ConfigService } from '@nestjs/config';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   createWalletClient,
@@ -8,38 +10,50 @@ import {
   Address,
   ContractFunctionExecutionError,
   formatEther,
-  PublicClient,
   formatUnits,
   webSocket,
   Log,
+  parseUnits,
 } from 'viem';
 
+import { Network } from '@src/types/types';
+import { WalletService } from '@modules/wallet/wallet.service';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { RedisService } from '@modules/redis/redis.service';
-import { encryptPrivateKey } from '@src/utils/crypto';
-import { chains, erc20Abi, erc20TransferEvent, isChainMonitoring } from '@src/utils/constants';
-import { Transaction, ViemClientsType } from './types';
-import { Network, SessionUserToken } from '@src/types/types';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { decodeLogAddress } from '@src/utils/utils';
+import { decryptPrivateKey, encryptPrivateKey } from '@src/utils/crypto';
 import { isEtherAddressArr, isNetworkArr } from '@src/types/typeGuards';
+import { anvilAbi, chains, erc20Abi, erc20TransferEvent, isChainMonitoring } from '@src/utils/constants';
+import {
+  BalanceInfo,
+  GetBalanceParams,
+  GetTokenBalanceParams,
+  SendTokensParams,
+  SendTransactionParams,
+  TokenBalanceReturnType,
+  Transaction,
+  ViemClientsType,
+} from './types';
 
 @Injectable()
 export class ViemProvider implements OnModuleInit {
-  private clients: ViemClientsType;
-  private anvilClients: ViemClientsType;
+  private readonly nodeEnv: string;
+  private readonly notProd: boolean;
+  private readonly clients: ViemClientsType;
+  private readonly anvilClients: ViemClientsType;
   private unwatchCallbacks: { [key in Network]: () => void };
 
   constructor(
     private readonly redisService: RedisService,
+    private readonly walletService: WalletService,
     private readonly configService: ConfigService,
     private readonly anvilProvider: AnvilProvider,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
+    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.notProd = this.nodeEnv !== 'production';
 
-    if (nodeEnv !== 'production') {
-      this.anvilClients = this.anvilProvider.createClients();
-    }
+    if (this.notProd) this.anvilClients = this.anvilProvider.createClients();
 
     this.clients = this.createClients();
     this.unwatchCallbacks = {} as { [key in Network]: () => void };
@@ -62,9 +76,8 @@ export class ViemProvider implements OnModuleInit {
   async createWallet(network: Network) {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
 
-    if (nodeEnv !== 'production') {
+    if (this.notProd) {
       await this.anvilProvider.setTestBalance({ network, address: account.address });
     }
 
@@ -94,14 +107,9 @@ export class ViemProvider implements OnModuleInit {
           transport: webSocket(value.rpcUrl),
         });
 
-        clients.wallet[keyNetwork] = createWalletClient({
-          chain: value.chain,
-          transport: http(value.rpcUrl),
-        });
-
         return clients;
       },
-      { public: {}, wallet: {}, publicWebsocket: {} } as ViemClientsType,
+      { public: {}, publicWebsocket: {} } as ViemClientsType,
     );
   }
 
@@ -112,19 +120,20 @@ export class ViemProvider implements OnModuleInit {
     address: Address;
     network: Network;
   }): Promise<{ name: string; symbol: string; decimals: number }> {
-    const networkClient = this.clients.public[network];
+    const publicClient = this.clients.public[network];
 
     try {
-      const chainId = await networkClient.getChainId();
+      // TODO: проверить в других местах
+      const chainId = await publicClient.getChainId();
       const curChain = chains(this.configService)[network];
       if (chainId !== curChain.chain.id) {
         throw new Error(`Ошибка подключения к сети ${curChain.name}`);
       }
 
       const [name, symbol, decimals] = await Promise.all([
-        networkClient.readContract({ address, abi: erc20Abi, functionName: 'name' }),
-        networkClient.readContract({ address, abi: erc20Abi, functionName: 'symbol' }),
-        networkClient.readContract({ address, abi: erc20Abi, functionName: 'decimals' }),
+        publicClient.readContract({ address, abi: erc20Abi, functionName: 'name' }),
+        publicClient.readContract({ address, abi: erc20Abi, functionName: 'symbol' }),
+        publicClient.readContract({ address, abi: erc20Abi, functionName: 'decimals' }),
       ]);
 
       return {
@@ -141,74 +150,79 @@ export class ViemProvider implements OnModuleInit {
     }
   }
 
-  async getBalance({
-    chatId,
-    address,
-    network,
-  }: {
-    chatId: number;
-    address: Address;
-    network: Network;
-  }): Promise<string> {
+  async getBalance({ chatId, address, network }: GetBalanceParams): Promise<string> {
     try {
-      const nodeEnv = this.configService.get<string>('NODE_ENV');
-      const networkClient = nodeEnv !== 'production' ? this.anvilClients.public[network] : this.clients.public[network];
+      const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
 
       const chain = chains(this.configService)[network];
-      const nativeBalance = await networkClient.getBalance({ address });
+      const nativeBalance = await publicClient.getBalance({ address });
       const formattedNativeBalance = formatEther(nativeBalance);
-      let tokens =
-        nodeEnv !== 'production'
-          ? (await this.redisService.getTestTokens(chatId)) || []
-          : (await this.redisService.getTokens(chatId)) || [];
+
+      let tokens = this.notProd
+        ? (await this.redisService.getTestTokens(chatId)) || []
+        : (await this.redisService.getTokens(chatId)) || [];
 
       tokens = tokens.filter(t => t.network === network);
 
-      let balanceReply = `<b>Адрес:</b> <code>${address}</code>\n`;
-      balanceReply += `<b>Сеть:</b> ${network}\n`;
-      balanceReply += `<b>${chain.nativeCurrency.symbol}:</b> ${formattedNativeBalance}\n`;
+      const balanceInfo: BalanceInfo = {
+        address,
+        network,
+        nativeBalance: {
+          symbol: chain.nativeCurrency.symbol,
+          amount: formattedNativeBalance,
+        },
+        tokenBalances: [] as Array<{
+          symbol: string;
+          amount: string;
+          decimals: number;
+        }>,
+      };
 
-      if (!tokens.some((t: SessionUserToken) => t.network === network)) return balanceReply;
+      if (tokens.length) {
+        const tokenBalances = await Promise.all(
+          tokens.map(token =>
+            this.getTokenBalance({
+              tokenAddress: token.address,
+              walletAddress: address,
+              network,
+            }),
+          ),
+        );
 
-      for (const token of tokens) {
-        const tokenBalance = await this.getTokenBalance({
-          tokenAddress: token.address,
-          walletAddress: address,
-          networkClient,
-        });
-        balanceReply += tokenBalance;
+        balanceInfo.tokenBalances = tokenBalances;
       }
 
-      return balanceReply;
+      return this.formatBalanceResponse(balanceInfo);
     } catch (error) {
       console.error(error);
       throw new Error(`Ошибка получения баланса`);
     }
   }
 
-  private async getTokenBalance({
+  async getTokenBalance({
     tokenAddress,
     walletAddress,
-    networkClient,
-  }: {
-    tokenAddress: Address;
-    walletAddress: Address;
-    networkClient: PublicClient;
-  }): Promise<string> {
+    network,
+  }: GetTokenBalanceParams): Promise<TokenBalanceReturnType> {
+    const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
     const [balance, symbol, decimals] = await Promise.all([
-      networkClient.readContract({
+      publicClient.readContract({
         address: tokenAddress,
         abi: erc20Abi,
         functionName: 'balanceOf',
         args: [walletAddress],
       }),
-      networkClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
-      networkClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
     ]);
 
     const formattedBalance = formatUnits(balance, decimals);
 
-    return `<b>${symbol}:</b> ${formattedBalance}\n`;
+    return {
+      symbol,
+      decimals,
+      amount: formattedBalance,
+    };
   }
 
   @OnEvent('monitorTokens')
@@ -223,13 +237,10 @@ export class ViemProvider implements OnModuleInit {
       return;
     }
 
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-    const tokensAddresses =
-      nodeEnv !== 'production'
-        ? await this.redisService.getTestTokensSet(network)
-        : await this.redisService.getTokensSet(network);
-    const client =
-      nodeEnv !== 'production' ? this.anvilClients.publicWebsocket[network] : this.clients.publicWebsocket[network];
+    const tokensAddresses = this.notProd
+      ? await this.redisService.getTestTokensSet(network)
+      : await this.redisService.getTokensSet(network);
+    const client = this.notProd ? this.anvilClients.publicWebsocket[network] : this.clients.publicWebsocket[network];
 
     isEtherAddressArr(tokensAddresses);
 
@@ -258,6 +269,92 @@ export class ViemProvider implements OnModuleInit {
     Object.values(this.unwatchCallbacks).forEach(unwatch => unwatch());
   }
 
+  async sendTokens({ wallet, tokenAddress, amount, recipientAddress }: SendTokensParams) {
+    const {
+      symbol,
+      amount: balance,
+      decimals,
+    } = await this.getTokenBalance({
+      tokenAddress,
+      walletAddress: wallet.address,
+      network: wallet.network,
+    });
+
+    if (+balance < +amount) throw new Error(`Недостаточное количество токенов ${symbol} на балансе: ${balance}`);
+
+    await this.sendTransaction({
+      tokenAddress,
+      wallet,
+      recipientAddress,
+      amount,
+      decimals,
+    });
+  }
+
+  private async sendTransaction({ tokenAddress, wallet, recipientAddress, amount, decimals }: SendTransactionParams) {
+    const { network } = wallet;
+    const transactionAmount = parseUnits(amount, decimals);
+    const currency = chains(this.configService)[network].nativeCurrency.symbol;
+    const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
+
+    const account = privateKeyToAccount(
+      decryptPrivateKey({ encryptedPrivateKey: wallet.encryptedPrivateKey, configService: this.configService }),
+    );
+
+    const nativeBalance = await publicClient.getBalance({ address: account.address });
+    if (nativeBalance === 0n) throw new Error(`Пополните баланс <u>${currency}</u> для совершения транзакции`);
+
+    const abi = this.notProd ? anvilAbi : erc20Abi;
+    const chain = this.notProd ? anvil : chains(this.configService)[network].chain;
+    const rpcUrl = this.notProd
+      ? this.configService.get<string>(`ANVIL_RPC_URL`, 'http://dex_sniper-anvil:8545')
+      : chains(this.configService)[network].rpcUrl;
+
+    const walletClient = createWalletClient({
+      chain,
+      transport: http(rpcUrl),
+      account,
+    });
+
+    try {
+      const hash = await walletClient.writeContract({
+        address: tokenAddress,
+        abi,
+        chain,
+        functionName: 'transfer',
+        args: [recipientAddress, transactionAmount],
+        account,
+      });
+
+      console.log('Transaction hash:', hash);
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+      if (receipt.status !== 'success') {
+        throw new Error(`❌ Ошибка: токены не были отправлены`);
+      }
+
+      console.log('✅ Токены отправлены', receipt);
+    } catch (error) {
+      if (error?.details?.includes('Out of gas')) {
+        throw new Error(`Пополните баланс <u>${currency}</u> для совершения транзакции`);
+      }
+    }
+  }
+
+  private formatBalanceResponse(balanceInfo: BalanceInfo): string {
+    const { address, network, nativeBalance, tokenBalances } = balanceInfo;
+    let balanceReply = `<b>Адрес:</b> <code>${address}</code>\n`;
+    balanceReply += `<b>Сеть:</b> ${network}\n`;
+    balanceReply += `<b>${nativeBalance.symbol}:</b> ${nativeBalance.amount}\n`;
+
+    for (const token of tokenBalances) {
+      balanceReply += `<b>${token.symbol}:</b> ${token.amount}\n`;
+    }
+
+    return balanceReply;
+  }
+
   private parseTransactionLog(log: Log, network: Network): Transaction | null {
     try {
       if (log.topics[0] === erc20TransferEvent) {
@@ -265,8 +362,8 @@ export class ViemProvider implements OnModuleInit {
 
         return {
           hash: log.transactionHash ? log.transactionHash : `0x`,
-          from: log.topics[1] ? this.decodeAddress(log.topics[1]) : `0x`,
-          to: log.topics[2] ? this.decodeAddress(log.topics[2]) : `0x`,
+          from: log.topics[1] ? decodeLogAddress(log.topics[1]) : `0x`,
+          to: log.topics[2] ? decodeLogAddress(log.topics[2]) : `0x`,
           contractAddress: log.address,
           value: formatUnits(BigInt(log.data), decimals),
           data: log.data,
@@ -282,11 +379,10 @@ export class ViemProvider implements OnModuleInit {
   }
 
   private async canMonitoringChain(network: Network): Promise<boolean> {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
     const arr: Promise<boolean>[] = [];
 
     arr.push(this.redisService.isSetEmpty(`subscriptions:${network}`));
-    if (nodeEnv !== 'production') {
+    if (this.notProd) {
       arr.push(this.redisService.isSetEmpty(`testTokens:${network}`));
     } else {
       arr.push(this.redisService.isSetEmpty(`tokens:${network}`));
@@ -295,9 +391,5 @@ export class ViemProvider implements OnModuleInit {
     const [isTokensEmpty, isSubscriptionsEmpty] = await Promise.all(arr);
 
     return !isTokensEmpty && !isSubscriptionsEmpty;
-  }
-
-  private decodeAddress(topic: `0x${string}`): `0x${string}` {
-    return `0x${topic.slice(26)}`;
   }
 }

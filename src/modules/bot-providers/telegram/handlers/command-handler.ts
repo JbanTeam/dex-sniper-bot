@@ -40,6 +40,8 @@ export class CommandHandler {
         return this.replicate(message);
       case command.startsWith('/subscriptions'):
         return this.getSubscriptions(message);
+      case command.startsWith('/send'):
+        return this.sendTokens(message);
       case command.startsWith('/faketransaction'):
         return this.sendFakeTransaction(message);
       case command.startsWith('/help'):
@@ -202,7 +204,7 @@ export class CommandHandler {
         options: { reply_markup: { inline_keyboard: keyboard } },
       };
     } catch (error) {
-      console.log(`Error while subscribing to address: ${error.message}`);
+      console.log(`Error while setting replication params: ${error.message}`);
       return { text: `${error.message}` };
     }
   }
@@ -238,6 +240,35 @@ export class CommandHandler {
     }
   }
 
+  private async sendTokens(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+    try {
+      const [, tokenAddress, amount, recipientAddress] = message.text.split(' ');
+
+      isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
+      isEtherAddress(recipientAddress, 'Введите корректный адрес получателя');
+      if (!strIsPositiveNumber(amount)) throw new Error('Введите корректное количество токенов');
+
+      await this.redisService.setUserField(
+        message.chatId,
+        'tempSendTokens',
+        `${tokenAddress}:${amount}:${recipientAddress}`,
+      );
+
+      const networks = Object.entries(chains(this.configService));
+      const keyboard = networks.map(([network, value]) => {
+        return [{ text: `${value.name}`, callback_data: `send-${network}` }];
+      });
+
+      return {
+        text: 'Выберите сеть:',
+        options: { reply_markup: { inline_keyboard: keyboard } },
+      };
+    } catch (error) {
+      console.log(`Error while sending tokens: ${error.message}`);
+      return { text: `${error.message}` };
+    }
+  }
+
   private async sendFakeTransaction(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
     try {
       const testTokens = await this.redisService.getTestTokens(message.chatId);
@@ -245,10 +276,10 @@ export class CommandHandler {
       if (!testTokens || !testTokens?.length) {
         throw new Error('У вас нет токенов, чтобы отправить транзакцию');
       }
-      const contractAddress = testTokens[0].address;
+      const testToken = testTokens[0];
 
-      if (!contractAddress) throw new Error('Токен не найден');
-      await this.blockchainService.sendFakeTransaction(contractAddress);
+      if (!testToken) throw new Error('Токен не найден');
+      await this.blockchainService.sendFakeTransaction(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
     } catch (error) {

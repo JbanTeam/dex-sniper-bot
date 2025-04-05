@@ -14,6 +14,8 @@ import { DeleteConditions, Network, NewAddedTokenParams, SessionData, SessionUse
 
 @Injectable()
 export class UserService {
+  private readonly nodeEnv: string;
+  private readonly notProd: boolean;
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -23,7 +25,10 @@ export class UserService {
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+  ) {
+    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.notProd = this.nodeEnv !== 'production';
+  }
 
   async getOrCreateUser({ chatId, telegramUserId }: RegisterDto): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
@@ -67,8 +72,6 @@ export class UserService {
     address: Address;
     network: Network;
   }): Promise<{ tokens: SessionUserToken[] }> {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-
     if (userSession.tokens.some(t => t.address === address && t.network === network)) {
       throw new Error('Токен уже добавлен');
     }
@@ -94,7 +97,7 @@ export class UserService {
     delete sessionToken.user;
     const tokens = [...userSession.tokens, sessionToken];
 
-    if (nodeEnv !== 'production') {
+    if (this.notProd) {
       const createdTestToken = await this.blockchainService.deployTestContract({
         wallet: userSession.wallets.find(w => w.network === network)!,
         token: sessionToken,
@@ -190,7 +193,6 @@ export class UserService {
   }
 
   private async checkNewAddedToken({ chatId, tokens, token, isTest = false }: NewAddedTokenParams): Promise<void> {
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
     const prefix = isTest ? 'testToken' : 'token';
     const setName = `${prefix}s`;
 
@@ -198,7 +200,7 @@ export class UserService {
 
     await this.redisService.addToken({ chatId, token, tokens, prefix });
 
-    if (!exists && isTest === (nodeEnv !== 'production')) {
+    if (!exists && isTest === this.notProd) {
       this.eventEmitter.emit('monitorTokens', { network: token.network });
     }
   }

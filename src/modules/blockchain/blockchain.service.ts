@@ -8,6 +8,7 @@ import { AnvilProvider } from './viem/anvil/anvil.provider';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { RedisService } from '@modules/redis/redis.service';
+import { SendTokensParams } from './viem/types';
 import { Network, SessionUserToken, SessionWallet } from '@src/types/types';
 
 @Injectable()
@@ -60,6 +61,10 @@ export class BlockchainService {
     return this.viemProvider.getBalance({ address, network, chatId });
   }
 
+  async sendTokens(sendTokensParams: SendTokensParams) {
+    return this.viemProvider.sendTokens(sendTokensParams);
+  }
+
   async stopMonitoring() {
     await this.viemProvider.stopMonitoring();
   }
@@ -85,7 +90,7 @@ export class BlockchainService {
     });
   }
 
-  async sendFakeTransaction(contractAddress: Address) {
-    return this.anvilProvider.sendFakeTransaction(contractAddress);
+  async sendFakeTransaction(testToken: SessionUserToken) {
+    return this.anvilProvider.sendFakeTransaction(testToken);
   }
 }

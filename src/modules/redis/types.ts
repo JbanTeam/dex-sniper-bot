@@ -30,7 +30,6 @@ type DeleteTokensParams = {
 type FilterTokensParams = {
   userSession: SessionData;
   deleteConditions: DeleteConditions;
-  nodeEnv: string;
 };
 
 type CleanTokenSetsParams = {

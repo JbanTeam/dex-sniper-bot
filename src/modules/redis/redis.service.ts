@@ -16,8 +16,13 @@ import {
 @Injectable()
 export class RedisService {
   private readonly redisClient: Redis;
+  private readonly nodeEnv: string;
+  private readonly notProd: boolean;
 
   constructor(private readonly configService: ConfigService) {
+    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.notProd = this.nodeEnv !== 'production';
+
     this.redisClient = new Redis({
       host: this.configService.get<string>('REDIS_HOST', 'localhost'),
       port: this.configService.get<number>('REDIS_PORT', 6379),
@@ -53,20 +58,18 @@ export class RedisService {
   }
 
   async removeToken({ userSession, deleteConditions }: RemoveTokenParams) {
-    const nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
     const { chatId } = userSession;
 
     const { remainingTokens, deletedTokens, deletedTestTokens } = this.filterTokens({
       userSession,
       deleteConditions,
-      nodeEnv,
     });
 
     const pipe = this.redisClient.pipeline();
 
     this.deleteTokens({ pipe, chatId, tokens: remainingTokens.tokens, deletedTokens, prefix: 'token' });
 
-    if (nodeEnv !== 'production') {
+    if (this.notProd) {
       this.deleteTokens({
         pipe,
         chatId,
@@ -79,7 +82,7 @@ export class RedisService {
     await pipe.exec();
 
     await this.cleanTokenSets({ deletedTokens, prefix: 'token' });
-    if (nodeEnv !== 'production') {
+    if (this.notProd) {
       await this.cleanTokenSets({ deletedTokens: deletedTestTokens, prefix: 'testToken' });
     }
   }
@@ -184,6 +187,10 @@ export class RedisService {
     return await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
   }
 
+  async getTempSendTokens(chatId: number) {
+    return await this.redisClient.hget(`user:${chatId}`, 'tempSendTokens');
+  }
+
   async getWallets(chatId: number): Promise<SessionWallet[] | null> {
     const userData = await this.redisClient.hget(`user:${chatId}`, 'wallets');
     if (!userData) return null;
@@ -237,7 +244,7 @@ export class RedisService {
     return await this.redisClient.smembers(`subscriptions:${network}`);
   }
 
-  private filterTokens({ userSession, deleteConditions, nodeEnv }: FilterTokensParams) {
+  private filterTokens({ userSession, deleteConditions }: FilterTokensParams) {
     const { address, network } = deleteConditions;
     const deletedTokens: SessionUserToken[] = [];
     const deletedTestTokens: SessionUserToken[] = [];
@@ -250,7 +257,7 @@ export class RedisService {
     });
 
     let testTokens = userSession.testTokens;
-    if (nodeEnv !== 'production' && testTokens) {
+    if (this.notProd && testTokens) {
       const idSet = new Set(tokens.map(t => t.id));
       testTokens = testTokens.filter(token => {
         if (!idSet.has(token.id)) {

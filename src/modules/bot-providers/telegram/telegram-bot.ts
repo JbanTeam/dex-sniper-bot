@@ -12,8 +12,6 @@ import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuer
 @Injectable()
 export class TelegramBot implements BotProviderInterface {
   private TG_URL: string = 'https://api.telegram.org/bot';
-  private nodeEnv: string;
-  private firstSessionAssign: boolean;
 
   constructor(
     private readonly userService: UserService,
@@ -22,8 +20,6 @@ export class TelegramBot implements BotProviderInterface {
     private readonly configService: ConfigService,
   ) {
     const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
-    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
-    this.firstSessionAssign = this.nodeEnv !== 'production';
     this.TG_URL += token;
 
     this.setCommands().catch(console.error);
@@ -132,6 +128,7 @@ export class TelegramBot implements BotProviderInterface {
       { command: 'replicate', description: 'Установить какие сделки повторять, /replicate [buy/sell] [лимит суммы]' },
       { command: 'balance', description: 'Посмотреть баланс' },
       { command: 'subscriptions', description: 'Посмотреть мои подписки' },
+      { command: 'send', description: 'Отправить токены, /send [адрес токена] [сумма] [адрес получателя]' },
     ];
 
     const url = `${this.TG_URL}/setMyCommands`;
