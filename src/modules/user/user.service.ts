@@ -1,4 +1,3 @@
-import { Address } from 'viem';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -10,7 +9,15 @@ import { UserToken } from './user-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { DeleteConditions, Network, NewAddedTokenParams, SessionData, SessionUserToken } from '@src/types/types';
+import { Network, SessionUserToken } from '@src/types/types';
+import {
+  AddTokenParams,
+  CreateTestTokenParams,
+  CreateTokenEntityParams,
+  DeleteConditions,
+  RemoveTokenParams,
+  UpdateTokenStorageParams,
+} from './types';
 
 @Injectable()
 export class UserService {
@@ -63,71 +70,19 @@ export class UserService {
     return { action, user };
   }
 
-  async addToken({
-    userSession,
-    address,
-    network,
-  }: {
-    userSession: SessionData;
-    address: Address;
-    network: Network;
-  }): Promise<{ tokens: SessionUserToken[] }> {
-    if (userSession.tokens.some(t => t.address === address && t.network === network)) {
-      throw new Error('Токен уже добавлен');
-    }
+  async addToken({ userSession, address, network }: AddTokenParams): Promise<{ tokens: SessionUserToken[] }> {
+    this.validateTokenAddition({ userSession, address, network });
 
-    const networkTokens = userSession.tokens.filter(t => t.network === network);
-    if (networkTokens.length >= 5) {
-      throw new Error('Максимум можно добавить 5 токенов на одну сеть');
-    }
-
-    const { name, symbol, decimals } = await this.blockchainService.checkToken({ address, network });
-
-    const token = this.userTokenRepository.create({
-      address,
-      network,
-      user: { id: userSession.userId },
-      name,
-      symbol,
-      decimals,
-    });
-
-    const savedToken = await this.userTokenRepository.save(token);
-    const sessionToken = { ...savedToken, user: undefined };
-    delete sessionToken.user;
-    const tokens = [...userSession.tokens, sessionToken];
+    const { tokens, sessionToken, existsTokenId } = await this.createAndSaveToken({ userSession, address, network });
 
     if (this.notProd) {
-      const createdTestToken = await this.blockchainService.deployTestContract({
-        wallet: userSession.wallets.find(w => w.network === network)!,
-        token: sessionToken,
-      });
-      const testTokens = userSession?.testTokens?.length
-        ? [...userSession.testTokens, createdTestToken]
-        : [createdTestToken];
-
-      await this.checkNewAddedToken({
-        chatId: userSession.chatId,
-        tokens: testTokens,
-        token: createdTestToken,
-        isTest: true,
-      });
+      await this.createTestToken({ userSession, sessionToken, existsTokenId });
     }
-
-    await this.checkNewAddedToken({ chatId: userSession.chatId, tokens, token: sessionToken });
 
     return { tokens };
   }
 
-  async removeToken({
-    chatId,
-    address,
-    network,
-  }: {
-    chatId: number;
-    address?: Address;
-    network?: Network;
-  }): Promise<void> {
+  async removeToken({ chatId, address, network }: RemoveTokenParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
     if (!userSession) throw new Error('Пользователь не найден');
@@ -147,6 +102,10 @@ export class UserService {
       deleteConditions.address = address;
     } else if (network) {
       deleteConditions.network = network;
+    }
+
+    if (!network) {
+      network = userSession.tokens.find(t => t.address === address)?.network;
     }
 
     const deleteResult = await this.userTokenRepository.delete(deleteConditions);
@@ -192,16 +151,91 @@ export class UserService {
     return user;
   }
 
-  private async checkNewAddedToken({ chatId, tokens, token, isTest = false }: NewAddedTokenParams): Promise<void> {
-    const prefix = isTest ? 'testToken' : 'token';
-    const setName = `${prefix}s`;
+  private validateTokenAddition({ userSession, address, network }: AddTokenParams) {
+    if (userSession.tokens.some(t => t.address === address && t.network === network)) {
+      throw new Error('Токен уже добавлен');
+    }
 
-    const exists = await this.redisService.existsInSet(setName, token.address);
+    if (userSession.tokens.filter(t => t.network === network).length >= 5) {
+      throw new Error('Максимум можно добавить 5 токенов на одну сеть');
+    }
+  }
+
+  private async createAndSaveToken({ userSession, address, network }: AddTokenParams) {
+    const { name, symbol, decimals, existsTokenId } = await this.getTokenData({ address, network });
+
+    const token = this.createTokenEntity({ userSession, address, network, name, symbol, decimals });
+    const savedToken = await this.userTokenRepository.save(token);
+
+    const sessionToken = this.prepareSessionToken(savedToken);
+    const tokens = [...userSession.tokens, sessionToken];
+
+    await this.updateTokenStorage({ chatId: userSession.chatId, tokens, token: sessionToken });
+
+    return { tokens, sessionToken, existsTokenId };
+  }
+
+  private async getTokenData({ address, network }: Omit<AddTokenParams, 'userSession'>) {
+    const exists = await this.redisService.existsInSet(`tokens:${network}`, address);
+
+    if (exists) {
+      const existsToken = await this.redisService.getHashFeilds(`token:${address}`);
+      return {
+        name: existsToken.name,
+        symbol: existsToken.symbol,
+        decimals: Number(existsToken.decimals),
+        existsTokenId: existsToken.id,
+      };
+    }
+
+    const tokenData = await this.blockchainService.checkToken({ address, network });
+    return {
+      name: tokenData.name,
+      symbol: tokenData.symbol,
+      decimals: tokenData.decimals,
+      existsTokenId: '',
+    };
+  }
+
+  private createTokenEntity(tokenEntityParams: CreateTokenEntityParams) {
+    const { userSession, ...createParams } = tokenEntityParams;
+    return this.userTokenRepository.create({
+      ...createParams,
+      user: { id: userSession.userId },
+    });
+  }
+
+  private prepareSessionToken(savedToken: UserToken): SessionUserToken {
+    const sessionToken = { ...savedToken, user: undefined };
+    delete sessionToken.user;
+    return sessionToken;
+  }
+
+  private async updateTokenStorage({ chatId, tokens, token, isTest = false }: UpdateTokenStorageParams) {
+    const prefix = isTest ? 'testToken' : 'token';
+    const exists = await this.redisService.existsInSet(`${prefix}s:${token.network}`, token.address);
 
     await this.redisService.addToken({ chatId, token, tokens, prefix });
 
     if (!exists && isTest === this.notProd) {
       this.eventEmitter.emit('monitorTokens', { network: token.network });
     }
+  }
+
+  private async createTestToken({ userSession, sessionToken, existsTokenId }: CreateTestTokenParams) {
+    let testToken = existsTokenId ? await this.redisService.findTestTokenById(existsTokenId) : null;
+
+    if (!testToken) {
+      const wallet = userSession.wallets.find(w => w.network === sessionToken.network);
+      if (!wallet) throw new Error('Кошелек для сети не найден');
+
+      testToken = await this.blockchainService.deployTestContract({ wallet, token: sessionToken });
+    } else {
+      testToken.id = sessionToken.id;
+    }
+
+    const testTokens = userSession.testTokens ? [...userSession.testTokens, testToken] : [testToken];
+
+    await this.updateTokenStorage({ chatId: userSession.chatId, tokens: testTokens, token: testToken, isTest: true });
   }
 }

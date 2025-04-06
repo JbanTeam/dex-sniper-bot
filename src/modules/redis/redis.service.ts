@@ -50,10 +50,15 @@ export class RedisService {
   }
 
   async addToken({ chatId, token, tokens, prefix }: AddTokenParams) {
+    const exists = await this.existsInSet(`${prefix}s:${token.network}`, token.address);
+
     const pipe = this.redisClient.pipeline();
     pipe.hset(`user:${chatId}`, `${prefix}s`, JSON.stringify(tokens));
     pipe.hmset(`${prefix}:${token.address}:${chatId}`, token);
     pipe.sadd(`${prefix}s:${token.network}`, token.address);
+
+    if (!exists) pipe.hmset(`${prefix}:${token.address}`, token);
+
     await pipe.exec();
   }
 
@@ -80,7 +85,6 @@ export class RedisService {
     }
 
     await pipe.exec();
-
     await this.cleanTokenSets({ deletedTokens, prefix: 'token' });
     if (this.notProd) {
       await this.cleanTokenSets({ deletedTokens: deletedTestTokens, prefix: 'testToken' });
@@ -159,7 +163,11 @@ export class RedisService {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
     if (!userData) throw new Error('Пользователь не найден');
 
-    return this.parseUserData<SessionData>(userData);
+    return this.parseData<SessionData>(userData);
+  }
+
+  async getHashFeilds(key: string) {
+    return await this.redisClient.hgetall(key);
   }
 
   async getUserId(chatId: number) {
@@ -244,6 +252,27 @@ export class RedisService {
     return await this.redisClient.smembers(`subscriptions:${network}`);
   }
 
+  async findTestTokenById(id: string): Promise<SessionUserToken | null> {
+    const pattern = 'testToken:*';
+    let cursor = '0';
+
+    do {
+      const reply = await this.redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 10);
+      cursor = reply[0];
+      const keys = reply[1];
+
+      for (const key of keys) {
+        const tokenId = await this.redisClient.hget(key, 'id');
+        if (tokenId === id) {
+          const data = await this.redisClient.hgetall(key);
+          return this.parseData<SessionUserToken>(data);
+        }
+      }
+    } while (cursor !== '0');
+
+    return null;
+  }
+
   private filterTokens({ userSession, deleteConditions }: FilterTokensParams) {
     const { address, network } = deleteConditions;
     const deletedTokens: SessionUserToken[] = [];
@@ -289,6 +318,7 @@ export class RedisService {
     for (const token of deletedTokens) {
       const tokenExists = await this.hasKeysWithPattern(`${prefix}:${token.address}:*`);
       if (!tokenExists) {
+        pipe.del(`${prefix}:${token.address}`);
         pipe.srem(`${prefix}s:${token.network}`, token.address);
       }
     }
@@ -310,7 +340,7 @@ export class RedisService {
     return false;
   }
 
-  private parseUserData<T>(data: Record<string, string>): T {
+  private parseData<T>(data: Record<string, string>): T {
     const parsedObject: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {

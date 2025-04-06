@@ -1,5 +1,6 @@
-import { DeleteConditions, SessionData, SessionSubscription, SessionUserToken } from '@src/types/types';
 import { ChainableCommander } from 'ioredis';
+import { DeleteConditions } from '@modules/user/types';
+import { SessionData, SessionSubscription, SessionUserToken } from '@src/types/types';
 
 type AddTokenParams = {
   chatId: number;

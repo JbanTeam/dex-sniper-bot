@@ -10,11 +10,11 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true, type: 'bigint' })
   @IsNumber()
   chatId: number;
 
-  @Column({ unique: true })
+  @Column({ unique: true, type: 'bigint' })
   @IsNumber()
   telegramUserId: number;
 

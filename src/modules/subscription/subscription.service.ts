@@ -1,17 +1,17 @@
+import { Address } from 'viem';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
+import { User } from '@modules/user/user.entity';
 import { Subscription } from './subscription.entity';
 import { BlockchainService } from '../blockchain/blockchain.service';
-import { User } from '@modules/user/user.entity';
-import { Network, SessionSubscription } from '@src/types/types';
-import { Address } from 'viem';
 import { RedisService } from '@modules/redis/redis.service';
-import { chains, isChainMonitoring } from '@src/utils/constants';
 import { ConfigService } from '@nestjs/config';
 import { Transaction } from '@modules/blockchain/viem/types';
+import { chains, isChainMonitoring } from '@src/utils/constants';
+import { Network, SessionSubscription, UpdateSubscriptionParams } from '@src/types/types';
 
 @Injectable()
 export class SubscriptionService {
@@ -159,38 +159,7 @@ export class SubscriptionService {
   //   }
   // }
 
-  private async checkNewAddedSubscription({
-    chatId,
-    subscription,
-    subscriptions,
-  }: {
-    chatId: number;
-    subscription: SessionSubscription;
-    subscriptions: SessionSubscription[];
-  }): Promise<void> {
-    await this.redisService.addSubscription({
-      chatId,
-      subscription,
-      subscriptions,
-    });
-
-    if (!isChainMonitoring[subscription.network]) {
-      this.eventEmitter.emit('monitorTokens', { network: subscription.network });
-    }
-  }
-
-  // TODO: вынести в types
-  async updateSubscription({
-    chatId,
-    subscription,
-    action,
-    limit,
-  }: {
-    chatId: number;
-    subscription: Subscription;
-    action: 'buy' | 'sell';
-    limit: number;
-  }) {
+  async updateSubscription({ chatId, subscription, action, limit }: UpdateSubscriptionParams) {
     const updatedSubscription = await this.subscriptionRepository.update(subscription.id, { [action]: limit });
     if (!updatedSubscription.affected) throw new Error('Error updating subscription');
 
@@ -214,6 +183,26 @@ export class SubscriptionService {
     return await this.subscriptionRepository.findOne({
       where: { id },
     });
+  }
+
+  private async checkNewAddedSubscription({
+    chatId,
+    subscription,
+    subscriptions,
+  }: {
+    chatId: number;
+    subscription: SessionSubscription;
+    subscriptions: SessionSubscription[];
+  }): Promise<void> {
+    await this.redisService.addSubscription({
+      chatId,
+      subscription,
+      subscriptions,
+    });
+
+    if (!isChainMonitoring[subscription.network]) {
+      this.eventEmitter.emit('monitorTokens', { network: subscription.network });
+    }
   }
 
   private async findByUserId({ userId, address, network }: { userId: number; address: Address; network: Network }) {

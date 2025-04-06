@@ -155,9 +155,9 @@ export class TelegramBot implements BotProviderInterface {
   private async setSession(update: Message | CallbackQuery): Promise<void> {
     const { chatId, telegramUserId } = this.checkUpdate(update);
 
-    const userId = await this.redisService.getUserId(chatId);
+    const userExists = await this.redisService.existsInSet('users', chatId.toString());
 
-    if (userId) {
+    if (userExists) {
       await this.redisService.setUserField(chatId, 'action', 'get');
       return;
     }

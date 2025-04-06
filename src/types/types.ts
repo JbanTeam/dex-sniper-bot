@@ -1,5 +1,3 @@
-import { Address } from 'viem';
-
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
@@ -77,15 +75,9 @@ export type SessionUserToken = Omit<UserToken, 'user'>;
 export type SessionWallet = Omit<Wallet, 'user'>;
 export type SessionSubscription = Omit<Subscription, 'user'>;
 
-export type NewAddedTokenParams = {
+export type UpdateSubscriptionParams = {
   chatId: number;
-  tokens: SessionUserToken[];
-  token: SessionUserToken;
-  isTest?: boolean;
-};
-
-export type DeleteConditions = {
-  user: { id: number };
-  network?: Network;
-  address?: Address;
+  subscription: Subscription;
+  action: 'buy' | 'sell';
+  limit: number;
 };
