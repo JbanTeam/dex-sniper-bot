@@ -1,6 +1,7 @@
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
+import { Chain } from 'viem';
 
 export interface BotProviderInterface {
   sendMessage({
@@ -56,6 +57,32 @@ export enum Network {
   POLYGON = 'POLYGON',
 }
 
+export type ChainConfig = {
+  name: string;
+  rpcUrl: string;
+  rpcWsUrl: string;
+  chain: Chain;
+  nativeCurrency: {
+    name: string;
+    symbol: string;
+    decimals: number;
+    address: `0x${string}`;
+  };
+  exchange: string;
+  exchangeAddress: `0x${string}`;
+};
+
+export type ChainsType = {
+  [key in Network]: ChainConfig;
+};
+
+export type ExchangesType = {
+  [key in Network]: {
+    exchangeAddress: `0x${string}`;
+    testAddress: `0x${string}`;
+  };
+};
+
 export interface SessionData {
   userId: number;
   chatId: number;
@@ -74,10 +101,3 @@ export interface SessionData {
 export type SessionUserToken = Omit<UserToken, 'user'>;
 export type SessionWallet = Omit<Wallet, 'user'>;
 export type SessionSubscription = Omit<Subscription, 'user'>;
-
-export type UpdateSubscriptionParams = {
-  chatId: number;
-  subscription: Subscription;
-  action: 'buy' | 'sell';
-  limit: number;
-};

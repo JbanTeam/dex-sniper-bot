@@ -1,6 +1,5 @@
 import { anvil } from 'viem/chains';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   createWalletClient,
   createPublicClient,
@@ -17,8 +16,9 @@ import {
 } from 'viem';
 
 import { coinContract } from './coin-contract';
+import { anvilAbi } from '@src/utils/constants';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { Network, SessionUserToken } from '@src/types/types';
-import { anvilAbi, chains } from '@src/utils/constants';
 import {
   TestBalanceParams,
   SendTestTokenParams,
@@ -31,39 +31,37 @@ import {
 export class AnvilProvider {
   private walletClient: WalletClient;
   private publicClient: PublicClient;
+  private rpcUrl: string;
+  private rpcWsUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
-    const anvilRpcUrl = this.configService.get<string>('ANVIL_RPC_URL', 'http://dex_sniper-anvil:8545');
+  constructor(private readonly constants: ConstantsProvider) {
+    this.rpcUrl = this.constants.ANVIL_RPC_URL;
+    this.rpcWsUrl = this.constants.ANVIL_WS_RPC_URL;
+    console.log(this.rpcUrl);
+    console.log(this.rpcWsUrl);
     this.walletClient = createWalletClient({
       chain: anvil,
-      transport: http(anvilRpcUrl),
+      transport: http(this.rpcUrl),
     });
     this.publicClient = createPublicClient({
       chain: anvil,
-      transport: http(anvilRpcUrl),
+      transport: http(this.rpcUrl),
     });
   }
 
   createClients(): ViemClientsType {
-    const chainsArr = Object.entries(chains(this.configService));
-
-    const rpcUrl = this.configService.get<string>(`ANVIL_RPC_URL`, 'http://dex_sniper-anvil:8545');
-    const rpcWsUrl = this.configService.get<string>(`ANVIL_WS_RPC_URL`, 'ws://dex_sniper-anvil:8545');
+    const chainsArr = Object.entries(this.constants.chains);
 
     return chainsArr.reduce(
       (clients, [keyNetwork, value]) => {
-        if (!chains(this.configService)[keyNetwork]) {
-          throw new Error(`Неверная сеть: ${keyNetwork}`);
-        }
-
         clients.public[keyNetwork] = createPublicClient({
           chain: value.chain,
-          transport: http(rpcUrl),
+          transport: http(this.rpcUrl),
         });
 
         clients.publicWebsocket[keyNetwork] = createPublicClient({
           chain: value.chain,
-          transport: webSocket(rpcWsUrl),
+          transport: webSocket(this.rpcWsUrl),
         });
 
         return clients;
@@ -192,11 +190,10 @@ export class AnvilProvider {
 
   async setTestBalance({ network, address }: { network: Network; address: Address }) {
     try {
-      const rpcUrl = this.configService.get<string>(`ANVIL_RPC_URL`, 'http://dex_sniper-anvil:8545');
       const client = createTestClient({
         mode: 'anvil',
-        chain: chains(this.configService)[network].chain,
-        transport: http(rpcUrl),
+        chain: this.constants.chains[network].chain,
+        transport: http(this.rpcUrl),
       }).extend(publicActions);
 
       await client.request({

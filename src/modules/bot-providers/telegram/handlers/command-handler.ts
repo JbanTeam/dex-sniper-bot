@@ -6,9 +6,10 @@ import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { IncomingMessage, SendMessageOptions } from '@src/types/types';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { chains, helpMessage, startMessage } from '@src/utils/constants';
+import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
 import { strIsPositiveNumber } from '@src/utils/utils';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 
 @Injectable()
 export class CommandHandler {
@@ -17,6 +18,7 @@ export class CommandHandler {
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly constants: ConstantsProvider,
     private readonly configService: ConfigService,
   ) {}
 
@@ -63,7 +65,7 @@ export class CommandHandler {
 
       await this.redisService.setUserField(message.chatId, 'tempToken', tokenAddress);
 
-      const chainsArr = Object.entries(chains(this.configService));
+      const chainsArr = Object.entries(this.constants.chains);
       const keardboard = chainsArr.map(([keyNetwork, value]) => {
         return [{ text: value.name, callback_data: `add-${keyNetwork}` }];
       });
@@ -101,8 +103,8 @@ export class CommandHandler {
       }
 
       const keyboard = userSession.wallets?.map(wallet => {
-        const network = chains(this.configService)[wallet.network];
-        return [{ text: `${network.name}`, callback_data: `rm-${wallet.network}` }];
+        const chain = this.constants.chains[wallet.network];
+        return [{ text: `${chain.name}`, callback_data: `rm-${wallet.network}` }];
       });
       keyboard?.push([{ text: 'Все токены', callback_data: 'rm-all' }]);
 
@@ -127,7 +129,7 @@ export class CommandHandler {
 
       await this.redisService.setUserField(message.chatId, 'tempWallet', walletAddress);
 
-      const chainsArr = Object.entries(chains(this.configService));
+      const chainsArr = Object.entries(this.constants.chains);
       const keardboard = chainsArr.map(([keyNetwork, value]) => {
         return [{ text: `${value.exchange} (${keyNetwork})`, callback_data: `subnet-${keyNetwork}` }];
       });
@@ -254,7 +256,7 @@ export class CommandHandler {
         `${tokenAddress}:${amount}:${recipientAddress}`,
       );
 
-      const networks = Object.entries(chains(this.configService));
+      const networks = Object.entries(this.constants.chains);
       const keyboard = networks.map(([network, value]) => {
         return [{ text: `${value.name}`, callback_data: `send-${network}` }];
       });

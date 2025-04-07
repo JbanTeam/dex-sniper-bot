@@ -1,8 +1,8 @@
 // import { Injectable } from '@nestjs/common';
 import { MessageHandler } from './telegram/handlers/message-handler';
 import { CommandHandler } from './telegram/handlers/command-handler';
-import { BotProviderInterface, IncomingMessage, IncomingQuery, SendMessageOptions } from '@src/types/types';
 import { QueryHandler } from './telegram/handlers/query-handler';
+import { BotProviderInterface, IncomingMessage, IncomingQuery, SendMessageOptions } from '@src/types/types';
 
 export class BotProvider {
   constructor(

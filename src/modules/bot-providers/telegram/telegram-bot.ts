@@ -2,9 +2,8 @@ import axios from 'axios';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 
 import { RedisService } from '@modules/redis/redis.service';
-import { ConfigService } from '@nestjs/config';
 import { UserService } from '@modules/user/user.service';
-import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { CallbackQuery, Message, TelegramUpdateResponse } from './types/types';
 import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
@@ -16,10 +15,9 @@ export class TelegramBot implements BotProviderInterface {
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
-    private readonly blockchainService: BlockchainService,
-    private readonly configService: ConfigService,
+    private readonly constants: ConstantsProvider,
   ) {
-    const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
+    const token = this.constants.TELEGRAM_BOT_TOKEN;
     this.TG_URL += token;
 
     this.setCommands().catch(console.error);

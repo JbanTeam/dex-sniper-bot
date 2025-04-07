@@ -17,13 +17,13 @@ import {
 } from 'viem';
 
 import { Network } from '@src/types/types';
-import { WalletService } from '@modules/wallet/wallet.service';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { RedisService } from '@modules/redis/redis.service';
 import { decodeLogAddress } from '@src/utils/utils';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { decryptPrivateKey, encryptPrivateKey } from '@src/utils/crypto';
 import { isEtherAddressArr, isNetworkArr } from '@src/types/typeGuards';
-import { anvilAbi, chains, erc20Abi, erc20TransferEvent, isChainMonitoring } from '@src/utils/constants';
+import { anvilAbi, erc20Abi, erc20TransferEvent } from '@src/utils/constants';
 import {
   BalanceInfo,
   GetBalanceParams,
@@ -45,9 +45,9 @@ export class ViemProvider implements OnModuleInit {
 
   constructor(
     private readonly redisService: RedisService,
-    private readonly walletService: WalletService,
     private readonly configService: ConfigService,
     private readonly anvilProvider: AnvilProvider,
+    private readonly constants: ConstantsProvider,
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
@@ -57,13 +57,13 @@ export class ViemProvider implements OnModuleInit {
 
     this.clients = this.createClients();
     this.unwatchCallbacks = {} as { [key in Network]: () => void };
-    Object.keys(chains(this.configService)).forEach(network => {
+    Object.keys(this.constants.chains).forEach(network => {
       this.unwatchCallbacks[network] = () => {};
     });
   }
 
   onModuleInit() {
-    const networkKeys = Object.keys(chains(this.configService));
+    const networkKeys = Object.keys(this.constants.chains);
     isNetworkArr(networkKeys);
 
     for (const network of networkKeys) {
@@ -89,14 +89,10 @@ export class ViemProvider implements OnModuleInit {
   }
 
   private createClients(): ViemClientsType {
-    const chainsArr = Object.entries(chains(this.configService));
+    const chainsArr = Object.entries(this.constants.chains);
 
     return chainsArr.reduce(
       (clients, [keyNetwork, value]) => {
-        if (!chains(this.configService)[keyNetwork]) {
-          throw new Error(`Неверная сеть: ${keyNetwork}`);
-        }
-
         clients.public[keyNetwork] = createPublicClient({
           chain: value.chain,
           transport: http(value.rpcUrl),
@@ -125,7 +121,7 @@ export class ViemProvider implements OnModuleInit {
     try {
       // TODO: проверить в других местах
       const chainId = await publicClient.getChainId();
-      const curChain = chains(this.configService)[network];
+      const curChain = this.constants.chains[network];
       if (chainId !== curChain.chain.id) {
         throw new Error(`Ошибка подключения к сети ${curChain.name}`);
       }
@@ -154,7 +150,7 @@ export class ViemProvider implements OnModuleInit {
     try {
       const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
 
-      const chain = chains(this.configService)[network];
+      const chain = this.constants.chains[network];
       const nativeBalance = await publicClient.getBalance({ address });
       const formattedNativeBalance = formatEther(nativeBalance);
 
@@ -232,7 +228,7 @@ export class ViemProvider implements OnModuleInit {
     const canMonitoringChain = await this.canMonitoringChain(network);
     console.log(`${network} canMonitoringChain`, canMonitoringChain);
     if (!canMonitoringChain) {
-      isChainMonitoring[network] = false;
+      this.constants.isChainMonitoring[network] = false;
       this.unwatchCallbacks[network]();
       return;
     }
@@ -262,7 +258,7 @@ export class ViemProvider implements OnModuleInit {
       },
     });
 
-    isChainMonitoring[network] = true;
+    this.constants.isChainMonitoring[network] = true;
   }
 
   async stopMonitoring() {
@@ -293,8 +289,9 @@ export class ViemProvider implements OnModuleInit {
 
   private async sendTransaction({ tokenAddress, wallet, recipientAddress, amount, decimals }: SendTransactionParams) {
     const { network } = wallet;
+    const { chains } = this.constants;
     const transactionAmount = parseUnits(amount, decimals);
-    const currency = chains(this.configService)[network].nativeCurrency.symbol;
+    const currency = chains[network].nativeCurrency.symbol;
     const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
 
     const account = privateKeyToAccount(
@@ -305,10 +302,8 @@ export class ViemProvider implements OnModuleInit {
     if (nativeBalance === 0n) throw new Error(`Пополните баланс <u>${currency}</u> для совершения транзакции`);
 
     const abi = this.notProd ? anvilAbi : erc20Abi;
-    const chain = this.notProd ? anvil : chains(this.configService)[network].chain;
-    const rpcUrl = this.notProd
-      ? this.configService.get<string>(`ANVIL_RPC_URL`, 'http://dex_sniper-anvil:8545')
-      : chains(this.configService)[network].rpcUrl;
+    const chain = this.notProd ? anvil : chains[network].chain;
+    const rpcUrl = this.notProd ? this.constants.ANVIL_RPC_URL : chains[network].rpcUrl;
 
     const walletClient = createWalletClient({
       chain,

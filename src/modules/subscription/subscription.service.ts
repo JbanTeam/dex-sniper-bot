@@ -10,8 +10,9 @@ import { BlockchainService } from '../blockchain/blockchain.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConfigService } from '@nestjs/config';
 import { Transaction } from '@modules/blockchain/viem/types';
-import { chains, isChainMonitoring } from '@src/utils/constants';
-import { Network, SessionSubscription, UpdateSubscriptionParams } from '@src/types/types';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { UpdateSubscriptionParams } from './types';
+import { Network, SessionSubscription } from '@src/types/types';
 
 @Injectable()
 export class SubscriptionService {
@@ -22,6 +23,7 @@ export class SubscriptionService {
     private readonly userRepository: Repository<User>,
     private readonly blockchainService: BlockchainService,
     private readonly redisService: RedisService,
+    private readonly constants: ConstantsProvider,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -87,10 +89,9 @@ export class SubscriptionService {
       throw new Error('Вы не подписаны ни на один кошелек');
     }
 
-    const chainsObj = chains(this.configService);
     const groupedSubscriptions = subscriptions.reduce(
       (acc, subscription) => {
-        const exchange = chainsObj[subscription.network].exchange;
+        const exchange = this.constants.chains[subscription.network].exchange;
         if (!acc[exchange]) {
           acc[exchange] = [];
         }
@@ -200,7 +201,7 @@ export class SubscriptionService {
       subscriptions,
     });
 
-    if (!isChainMonitoring[subscription.network]) {
+    if (!this.constants.isChainMonitoring[subscription.network]) {
       this.eventEmitter.emit('monitorTokens', { network: subscription.network });
     }
   }

@@ -1,7 +1,4 @@
-import { ConfigService } from '@nestjs/config';
-import { Network } from '@src/types/types';
 import { parseAbi } from 'viem';
-import { bsc, polygon } from 'viem/chains';
 
 export const startMessage = `
 <strong>Добро пожаловать в DexSniperMegaBot!</strong> 🔥🔥🔥
@@ -29,65 +26,6 @@ export const helpMessage = `
 /balance - Посмотреть баланс
 /subscriptions - Посмотреть мои подписки
 `;
-
-// TODO: поменять ws rpc
-// TODO: проверить exchangeAddress
-// TODO: переделать чтобы не вызывать каждый раз функцию
-export const chains = (configService: ConfigService) => {
-  return {
-    [Network.BSC]: {
-      name: 'Binance Smart Chain',
-      rpcUrl: configService.get<string>('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/'),
-      rpcWsUrl: configService.get<string>('BSC_WS_RPC_URL', 'https://bsc-dataseed.binance.org/'),
-      chain: bsc,
-      nativeCurrency: {
-        name: 'BNB',
-        symbol: 'BNB',
-        decimals: 18,
-        address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-      },
-      exchange: 'PancakeSwap',
-      exchangeAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
-    },
-    [Network.POLYGON]: {
-      name: 'Polygon',
-      rpcUrl: configService.get<string>('POLYGON_RPC_URL', 'https://polygon-rpc.com/'),
-      rpcWsUrl: configService.get<string>('POLYGON_WS_RPC_URL', 'https://polygon-rpc.com/'),
-      chain: polygon,
-      nativeCurrency: {
-        name: 'POL',
-        symbol: 'POL',
-        decimals: 18,
-        address: '0x455e53CBB86018Ac2B8092FdCd39d8444AFFC3F6',
-      },
-      exchange: 'Uniswap',
-      exchangeAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
-    },
-  };
-};
-
-export const isChainMonitoring = {
-  [Network.BSC]: false,
-  [Network.POLYGON]: false,
-};
-
-type ExchangesType = {
-  [key in Network]: {
-    exchangeAddress: `0x${string}`;
-    testAddress: `0x${string}`;
-  };
-};
-
-export const exchangeAddresses: ExchangesType = {
-  [Network.BSC]: {
-    exchangeAddress: `0x`,
-    testAddress: `0x`,
-  },
-  [Network.POLYGON]: {
-    exchangeAddress: `0x`,
-    testAddress: `0x`,
-  },
-};
 
 // TODO: нужно ли добавить event transfer
 export const erc20Abi = parseAbi([
