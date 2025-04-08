@@ -17,6 +17,7 @@ import {
 
 import { coinContract } from './coin-contract';
 import { anvilAbi } from '@src/utils/constants';
+import { BotError } from '@src/errors/BotError';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { Network, SessionUserToken } from '@src/types/types';
 import {
@@ -37,8 +38,6 @@ export class AnvilProvider {
   constructor(private readonly constants: ConstantsProvider) {
     this.rpcUrl = this.constants.ANVIL_RPC_URL;
     this.rpcWsUrl = this.constants.ANVIL_WS_RPC_URL;
-    console.log(this.rpcUrl);
-    console.log(this.rpcWsUrl);
     this.walletClient = createWalletClient({
       chain: anvil,
       transport: http(this.rpcUrl),
@@ -110,7 +109,7 @@ export class AnvilProvider {
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
 
     if (!receipt.contractAddress) {
-      throw new Error(`❌ Ошибка: тестовый контракт ${name} не был создан!`);
+      throw new BotError(`Test contract ${name} not created ❌`, `Тестовый контракт ${name} не был создан ❌`, 400);
     }
 
     const contractAddress = receipt.contractAddress;
@@ -144,12 +143,12 @@ export class AnvilProvider {
       account: testAccount,
     });
 
-    console.log('Transaction hash:', hash);
+    console.log('#️⃣ Transaction hash:', hash);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new Error(`❌ Ошибка: тестовые токены не были отправлены!`);
+      throw new BotError(`Test tokens not sent ❌`, `Тестовый токены не были отправлены ❌`, 400);
     }
 
     console.log('✅ Токены отправлены', receipt);
@@ -170,12 +169,12 @@ export class AnvilProvider {
       account: pancakeAddress,
     });
 
-    console.log('Transaction hash:', hash);
+    console.log('#️⃣ Transaction hash:', hash);
 
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new Error(`❌ Ошибка: тестовые токены не были отправлены!`);
+      throw new BotError(`Test tokens not sent ❌`, `Тестовые токены не были отправлены ❌`, 400);
     }
 
     console.log('✅ Токены отправлены', receipt);
@@ -202,7 +201,7 @@ export class AnvilProvider {
       });
     } catch (error) {
       console.error(error);
-      throw new Error(`Ошибка установления баланса`);
+      throw new BotError(`Error setting balance`, `Ошибка установления баланса`, 400);
     }
   }
 }

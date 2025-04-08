@@ -30,19 +30,26 @@ export class BotProvider {
 
   async start(): Promise<void> {
     await this.provider.onMessage(async (message: IncomingMessage | IncomingQuery) => {
-      let response: { text: string; options?: SendMessageOptions };
-      if ('data' in message) {
-        response = await this.queryHandler.handleQuery(message);
-        await this.deleteMessage(message.chatId, message.messageId);
-      } else {
-        if (message.text.startsWith('/')) {
-          response = await this.commandHandler.handleCommand(message);
-        } else {
-          response = await this.messageHandler.handleMessage(message);
-        }
-      }
-
-      await this.sendMessage({ chatId: message.chatId, ...response });
+      await this.handleIncomingMessage(message);
     });
+  }
+
+  private async handleIncomingMessage(message: IncomingMessage | IncomingQuery): Promise<void> {
+    const response = await this.routeMessage(message);
+    if ('data' in message) {
+      await this.deleteMessage(message.chatId, message.messageId);
+    }
+
+    await this.sendMessage({ chatId: message.chatId, ...response });
+  }
+
+  private async routeMessage(message: IncomingMessage | IncomingQuery) {
+    if ('data' in message) {
+      return this.queryHandler.handleQuery(message);
+    }
+
+    return message.text.startsWith('/')
+      ? this.commandHandler.handleCommand(message)
+      : this.messageHandler.handleMessage(message);
   }
 }

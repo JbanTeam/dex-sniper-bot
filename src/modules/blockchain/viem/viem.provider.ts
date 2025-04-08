@@ -34,6 +34,7 @@ import {
   Transaction,
   ViemClientsType,
 } from './types';
+import { BotError } from '@src/errors/BotError';
 
 @Injectable()
 export class ViemProvider implements OnModuleInit {
@@ -83,30 +84,9 @@ export class ViemProvider implements OnModuleInit {
 
     return {
       network,
-      encryptedPrivateKey: encryptPrivateKey({ privateKey, configService: this.configService }),
+      encryptedPrivateKey: encryptPrivateKey({ privateKey, encryptKey: this.constants.ENCRYPT_KEY }),
       address: account.address,
     };
-  }
-
-  private createClients(): ViemClientsType {
-    const chainsArr = Object.entries(this.constants.chains);
-
-    return chainsArr.reduce(
-      (clients, [keyNetwork, value]) => {
-        clients.public[keyNetwork] = createPublicClient({
-          chain: value.chain,
-          transport: http(value.rpcUrl),
-        });
-
-        clients.publicWebsocket[keyNetwork] = createPublicClient({
-          chain: value.chain,
-          transport: webSocket(value.rpcUrl),
-        });
-
-        return clients;
-      },
-      { public: {}, publicWebsocket: {} } as ViemClientsType,
-    );
   }
 
   async checkToken({
@@ -119,13 +99,6 @@ export class ViemProvider implements OnModuleInit {
     const publicClient = this.clients.public[network];
 
     try {
-      // TODO: проверить в других местах
-      const chainId = await publicClient.getChainId();
-      const curChain = this.constants.chains[network];
-      if (chainId !== curChain.chain.id) {
-        throw new Error(`Ошибка подключения к сети ${curChain.name}`);
-      }
-
       const [name, symbol, decimals] = await Promise.all([
         publicClient.readContract({ address, abi: erc20Abi, functionName: 'name' }),
         publicClient.readContract({ address, abi: erc20Abi, functionName: 'symbol' }),
@@ -138,61 +111,59 @@ export class ViemProvider implements OnModuleInit {
         decimals,
       };
     } catch (error) {
-      console.error(error);
       if (error instanceof ContractFunctionExecutionError) {
-        throw new Error(`Этого токена не существует в сети ${network}`);
+        throw new BotError(
+          `This token does not exist in the network ${network}`,
+          `Этого токена не существует в сети ${network}`,
+          400,
+        );
       }
-      throw new Error(`Ошибка проверки токена`);
+      throw new BotError(`Error checking token`, `Ошибка проверки токена`, 400);
     }
   }
 
   async getBalance({ chatId, address, network }: GetBalanceParams): Promise<string> {
-    try {
-      const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
+    const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
 
-      const chain = this.constants.chains[network];
-      const nativeBalance = await publicClient.getBalance({ address });
-      const formattedNativeBalance = formatEther(nativeBalance);
+    const chain = this.constants.chains[network];
+    const nativeBalance = await publicClient.getBalance({ address });
+    const formattedNativeBalance = formatEther(nativeBalance);
 
-      let tokens = this.notProd
-        ? (await this.redisService.getTestTokens(chatId)) || []
-        : (await this.redisService.getTokens(chatId)) || [];
+    let tokens = this.notProd
+      ? (await this.redisService.getTestTokens(chatId)) || []
+      : (await this.redisService.getTokens(chatId)) || [];
 
-      tokens = tokens.filter(t => t.network === network);
+    tokens = tokens.filter(t => t.network === network);
 
-      const balanceInfo: BalanceInfo = {
-        address,
-        network,
-        nativeBalance: {
-          symbol: chain.nativeCurrency.symbol,
-          amount: formattedNativeBalance,
-        },
-        tokenBalances: [] as Array<{
-          symbol: string;
-          amount: string;
-          decimals: number;
-        }>,
-      };
+    const balanceInfo: BalanceInfo = {
+      address,
+      network,
+      nativeBalance: {
+        symbol: chain.nativeCurrency.symbol,
+        amount: formattedNativeBalance,
+      },
+      tokenBalances: [] as Array<{
+        symbol: string;
+        amount: string;
+        decimals: number;
+      }>,
+    };
 
-      if (tokens.length) {
-        const tokenBalances = await Promise.all(
-          tokens.map(token =>
-            this.getTokenBalance({
-              tokenAddress: token.address,
-              walletAddress: address,
-              network,
-            }),
-          ),
-        );
+    if (tokens.length) {
+      const tokenBalances = await Promise.all(
+        tokens.map(token =>
+          this.getTokenBalance({
+            tokenAddress: token.address,
+            walletAddress: address,
+            network,
+          }),
+        ),
+      );
 
-        balanceInfo.tokenBalances = tokenBalances;
-      }
-
-      return this.formatBalanceResponse(balanceInfo);
-    } catch (error) {
-      console.error(error);
-      throw new Error(`Ошибка получения баланса`);
+      balanceInfo.tokenBalances = tokenBalances;
     }
+
+    return this.formatBalanceResponse(balanceInfo);
   }
 
   async getTokenBalance({
@@ -254,6 +225,7 @@ export class ViemProvider implements OnModuleInit {
           }),
         ).catch(error => {
           console.error('Error processing logs:', error);
+          throw error;
         });
       },
     });
@@ -276,7 +248,13 @@ export class ViemProvider implements OnModuleInit {
       network: wallet.network,
     });
 
-    if (+balance < +amount) throw new Error(`Недостаточное количество токенов ${symbol} на балансе: ${balance}`);
+    if (+balance < +amount) {
+      throw new BotError(
+        `Not enough tokens ${symbol} on balance: ${balance}`,
+        `Недостаточное количество токенов <u>${symbol}</u> на балансе: ${balance}`,
+        400,
+      );
+    }
 
     await this.sendTransaction({
       tokenAddress,
@@ -287,6 +265,27 @@ export class ViemProvider implements OnModuleInit {
     });
   }
 
+  private createClients(): ViemClientsType {
+    const chainsArr = Object.entries(this.constants.chains);
+
+    return chainsArr.reduce(
+      (clients, [keyNetwork, value]) => {
+        clients.public[keyNetwork] = createPublicClient({
+          chain: value.chain,
+          transport: http(value.rpcUrl),
+        });
+
+        clients.publicWebsocket[keyNetwork] = createPublicClient({
+          chain: value.chain,
+          transport: webSocket(value.rpcUrl),
+        });
+
+        return clients;
+      },
+      { public: {}, publicWebsocket: {} } as ViemClientsType,
+    );
+  }
+
   private async sendTransaction({ tokenAddress, wallet, recipientAddress, amount, decimals }: SendTransactionParams) {
     const { network } = wallet;
     const { chains } = this.constants;
@@ -295,11 +294,16 @@ export class ViemProvider implements OnModuleInit {
     const publicClient = this.notProd ? this.anvilClients.public[network] : this.clients.public[network];
 
     const account = privateKeyToAccount(
-      decryptPrivateKey({ encryptedPrivateKey: wallet.encryptedPrivateKey, configService: this.configService }),
+      decryptPrivateKey({ encryptedPrivateKey: wallet.encryptedPrivateKey, encryptKey: this.constants.ENCRYPT_KEY }),
     );
 
     const nativeBalance = await publicClient.getBalance({ address: account.address });
-    if (nativeBalance === 0n) throw new Error(`Пополните баланс <u>${currency}</u> для совершения транзакции`);
+    if (nativeBalance === 0n)
+      throw new BotError(
+        `Top up balance ${currency} for transaction`,
+        `Пополните баланс <u>${currency}</u> для совершения транзакции`,
+        400,
+      );
 
     const abi = this.notProd ? anvilAbi : erc20Abi;
     const chain = this.notProd ? anvil : chains[network].chain;
@@ -326,14 +330,19 @@ export class ViemProvider implements OnModuleInit {
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
       if (receipt.status !== 'success') {
-        throw new Error(`❌ Ошибка: токены не были отправлены`);
+        throw new BotError(`Tokens not sent ❌`, `Токены не были отправлены ❌`, 400);
       }
 
       console.log('✅ Токены отправлены', receipt);
     } catch (error) {
       if (error?.details?.includes('Out of gas')) {
-        throw new Error(`Пополните баланс <u>${currency}</u> для совершения транзакции`);
+        throw new BotError(
+          `Top up balance ${currency} for transaction`,
+          `Пополните баланс <u>${currency}</u> для совершения транзакции`,
+          400,
+        );
       }
+      throw error;
     }
   }
 

@@ -13,6 +13,7 @@ import { Transaction } from '@modules/blockchain/viem/types';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UpdateSubscriptionParams } from './types';
 import { Network, SessionSubscription } from '@src/types/types';
+import { BotError } from '@src/errors/BotError';
 
 @Injectable()
 export class SubscriptionService {
@@ -31,11 +32,11 @@ export class SubscriptionService {
   async subscribeToWallet({ chatId, address, network }: { chatId: number; address: Address; network: Network }) {
     const userSession = await this.redisService.getUser(chatId);
 
-    if (!userSession) throw new Error('Пользователь не найден');
+    if (!userSession) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address === address);
 
-    if (existingSubscription) throw new Error('Вы уже подписаны на этот кошелек');
+    if (existingSubscription) throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400);
 
     const subscription = this.subscriptionRepository.create({
       user: { id: userSession.userId },
@@ -59,19 +60,21 @@ export class SubscriptionService {
   async unsubscribeFromWallet({ chatId, walletAddress }: { chatId: number; walletAddress: Address }) {
     const subscriptions = await this.redisService.getSubscriptions(chatId);
 
-    if (!subscriptions?.length) throw new Error('Вы не подписаны ни на один кошелек');
+    if (!subscriptions?.length)
+      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
 
     const sessionSubscription = subscriptions.find(sub => sub.address === walletAddress);
-    if (!sessionSubscription) throw new Error('Вы не подписаны на этот кошелек');
+    if (!sessionSubscription)
+      throw new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400);
 
     const subscription = await this.subscriptionRepository.findOne({
       where: { id: sessionSubscription.id },
     });
 
-    if (!subscription) throw new Error('Подписка не найдена');
+    if (!subscription) throw new BotError('Subscription not found', 'Подписка не найдена', 404);
     const deleted = await this.subscriptionRepository.delete({ id: subscription.id });
 
-    if (!deleted.affected) throw new Error('Ошибка при отписке от кошелька');
+    if (!deleted.affected) throw new BotError('Error unsubscribing from wallet', 'Ошибка при отписке от кошелька', 400);
 
     await this.redisService.removeSubscription({
       chatId,
@@ -86,7 +89,7 @@ export class SubscriptionService {
     const subscriptions = await this.redisService.getSubscriptions(chatId);
 
     if (!subscriptions?.length) {
-      throw new Error('Вы не подписаны ни на один кошелек');
+      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
     }
 
     const groupedSubscriptions = subscriptions.reduce(
@@ -162,7 +165,9 @@ export class SubscriptionService {
 
   async updateSubscription({ chatId, subscription, action, limit }: UpdateSubscriptionParams) {
     const updatedSubscription = await this.subscriptionRepository.update(subscription.id, { [action]: limit });
-    if (!updatedSubscription.affected) throw new Error('Error updating subscription');
+    if (!updatedSubscription.affected) {
+      throw new BotError('Error updating subscription', 'Ошибка при обновлении подписки', 400);
+    }
 
     subscription[action] = limit;
     const sessionSubscription = { ...subscription, user: undefined };
@@ -170,7 +175,7 @@ export class SubscriptionService {
     const subscriptions = await this.redisService.getSubscriptions(chatId);
 
     if (!subscriptions?.length) {
-      throw new Error('Вы не подписаны ни на один кошелек');
+      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
     }
 
     await this.redisService.updateSubscription({

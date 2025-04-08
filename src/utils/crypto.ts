@@ -1,20 +1,18 @@
-import * as crypto from 'crypto';
-import { ConfigService } from '@nestjs/config';
 import { Hex } from 'viem';
+import * as crypto from 'crypto';
+import { BotError } from '@src/errors/BotError';
 
-const encryptPrivateKey = ({
-  privateKey,
-  configService,
-}: {
-  privateKey: string;
-  configService: ConfigService;
-}): string => {
+const encryptPrivateKey = ({ privateKey, encryptKey }: { privateKey: string; encryptKey: string }): string => {
   const algorithm = 'aes-256-cbc';
-  const key = Buffer.from(configService.get<string>('ENCRYPT_KEY', 'super_secret_key'), 'hex');
+  const key = Buffer.from(encryptKey, 'hex');
   const iv = crypto.randomBytes(16);
 
   if (key.length !== 32) {
-    throw new Error('Invalid key length. Key must be 32 bytes (256 bits) in hex format.');
+    throw new BotError(
+      'Invalid key length. Key must be 32 bytes (256 bits) in hex format',
+      'Ошибка получения ключа',
+      400,
+    );
   }
 
   const cipher = crypto.createCipheriv(algorithm, key, iv);
@@ -26,22 +24,26 @@ const encryptPrivateKey = ({
 
 const decryptPrivateKey = ({
   encryptedPrivateKey,
-  configService,
+  encryptKey,
 }: {
   encryptedPrivateKey: string;
-  configService: ConfigService;
+  encryptKey: string;
 }): Hex => {
   const [ivHex, encryptedHex] = encryptedPrivateKey.split(':');
 
   if (!ivHex || !encryptedHex) {
-    throw new Error('Invalid encrypted string format');
+    throw new BotError('Invalid encrypted string format', 'Ошибка получения ключа', 400);
   }
 
-  const key = Buffer.from(configService.get<string>('ENCRYPT_KEY', 'super_secret_key'), 'hex');
+  const key = Buffer.from(encryptKey, 'hex');
   const iv = Buffer.from(ivHex, 'hex');
 
   if (key.length !== 32) {
-    throw new Error('Invalid key length. Key must be 32 bytes (256 bits) in hex format.');
+    throw new BotError(
+      'Invalid key length. Key must be 32 bytes (256 bits) in hex format',
+      'Ошибка получения ключа',
+      400,
+    );
   }
 
   const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);

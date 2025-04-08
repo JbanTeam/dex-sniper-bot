@@ -18,6 +18,7 @@ import {
   RemoveTokenParams,
   UpdateTokenStorageParams,
 } from './types';
+import { BotError } from '@src/errors/BotError';
 
 @Injectable()
 export class UserService {
@@ -50,17 +51,17 @@ export class UserService {
 
         const savedUser = await entityManager.save(createdUser);
 
-        await this.blockchainService.createWallet({
-          userId: savedUser.id,
-          network: Network.BSC,
-          entityManager,
-        });
-
-        await this.blockchainService.createWallet({
-          userId: savedUser.id,
-          network: Network.POLYGON,
-          entityManager,
-        });
+        // TODO: в зависимости от сети
+        const networksArr = Object.keys(Network);
+        await Promise.all(
+          networksArr.map(network => {
+            return this.blockchainService.createWallet({
+              userId: savedUser.id,
+              network: network as Network,
+              entityManager,
+            });
+          }),
+        );
 
         return this.findById({ id: savedUser.id }, entityManager);
       });
@@ -85,15 +86,17 @@ export class UserService {
   async removeToken({ chatId, address, network }: RemoveTokenParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
-    if (!userSession) throw new Error('Пользователь не найден');
-    if (!userSession.tokens.length) throw new Error('У вас нет сохраненных токенов');
+    if (!userSession) throw new BotError('User not found', 'Пользователь не найден', 404);
+    if (!userSession.tokens.length) {
+      throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404);
+    }
 
     if (network && !userSession.tokens.some(t => t.network === network)) {
-      throw new Error('Токены не найдены в указанной сети');
+      throw new BotError('Tokens not found in this network', 'Токены не найдены в указанной сети', 404);
     }
 
     if (address && !userSession.tokens.some(t => t.address === address)) {
-      throw new Error('Токен не найден');
+      throw new BotError('Token not found', 'Токен не найден', 404);
     }
 
     const deleteConditions: DeleteConditions = { user: { id: userSession.userId } };
@@ -110,7 +113,7 @@ export class UserService {
 
     const deleteResult = await this.userTokenRepository.delete(deleteConditions);
 
-    if (!deleteResult.affected) throw new Error('Токены не удалены');
+    if (!deleteResult.affected) throw new BotError('Tokens not deleted', 'Токены не удалены', 400);
 
     await this.redisService.removeToken({ userSession, deleteConditions });
 
@@ -153,11 +156,15 @@ export class UserService {
 
   private validateTokenAddition({ userSession, address, network }: AddTokenParams) {
     if (userSession.tokens.some(t => t.address === address && t.network === network)) {
-      throw new Error('Токен уже добавлен');
+      throw new BotError('Token already added', 'Токен уже добавлен', 400);
     }
 
     if (userSession.tokens.filter(t => t.network === network).length >= 5) {
-      throw new Error('Максимум можно добавить 5 токенов на одну сеть');
+      throw new BotError(
+        'You can add only 5 tokens per network',
+        'Максимум можно добавить 5 токенов на одну сеть',
+        400,
+      );
     }
   }
 
@@ -227,7 +234,7 @@ export class UserService {
 
     if (!testToken) {
       const wallet = userSession.wallets.find(w => w.network === sessionToken.network);
-      if (!wallet) throw new Error('Кошелек для сети не найден');
+      if (!wallet) throw new BotError('Wallet not found', 'Кошелек для сети не найден', 404);
 
       testToken = await this.blockchainService.deployTestContract({ wallet, token: sessionToken });
     } else {

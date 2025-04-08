@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
@@ -7,6 +7,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { CallbackQuery, Message, TelegramUpdateResponse } from './types/types';
 import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
+import { BotError } from '@src/errors/BotError';
 
 @Injectable()
 export class TelegramBot implements BotProviderInterface {
@@ -20,7 +21,10 @@ export class TelegramBot implements BotProviderInterface {
     const token = this.constants.TELEGRAM_BOT_TOKEN;
     this.TG_URL += token;
 
-    this.setCommands().catch(console.error);
+    this.setCommands().catch(error => {
+      console.error('Error setting commands:', error);
+      throw error;
+    });
   }
 
   async sendMessage({
@@ -69,9 +73,9 @@ export class TelegramBot implements BotProviderInterface {
 
       const data: TelegramUpdateResponse = response.data as TelegramUpdateResponse;
 
-      try {
-        if (data.ok && data.result.length > 0) {
-          for (const update of data.result) {
+      if (data.ok && data.result.length > 0) {
+        for (const update of data.result) {
+          try {
             if (update.message) {
               const message = this.parseMessage(update.message);
               await this.setSession(update.message);
@@ -83,11 +87,14 @@ export class TelegramBot implements BotProviderInterface {
             }
 
             if (update) offset = update.update_id + 1;
+          } catch (error) {
+            if (error instanceof BotError) {
+              if (update.message) error.incomingMessage = this.parseMessage(update.message);
+              if (update.callback_query) error.incomingMessage = this.parseQuery(update.callback_query);
+            }
+            throw error;
           }
         }
-      } catch (error) {
-        console.log('Error while processing updates:', error);
-        throw error;
       }
     }
   }
@@ -136,18 +143,13 @@ export class TelegramBot implements BotProviderInterface {
       language_code: 'ru',
     };
 
-    try {
-      const response = await axios.post(url, body);
+    const response = await axios.post(url, body);
 
-      if (!response.data.ok) {
-        throw new Error('Failed to set commands');
-      }
-
-      console.log('Commands set successfully:', response.data);
-    } catch (error) {
-      console.error('Error setting commands:', error);
-      throw error;
+    if (!response.data.ok) {
+      throw new BotError('Failed to set commands', 'Не удалось установить команды', 400);
     }
+
+    console.log('Commands set successfully:', response.data);
   }
 
   private async setSession(update: Message | CallbackQuery): Promise<void> {
@@ -165,8 +167,7 @@ export class TelegramBot implements BotProviderInterface {
       telegramUserId,
     });
 
-    // TODO: fix errors, write separate error for telegram, and check it
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     await this.redisService.addUser({
       chatId,
@@ -191,7 +192,7 @@ export class TelegramBot implements BotProviderInterface {
         telegramUserId: update.from.id,
       };
     } else {
-      throw new BadRequestException('Invalid chatId or telegramUserId');
+      throw new BotError('Unknown update type', 'Ошибка при обработке обновления', 400);
     }
   }
 

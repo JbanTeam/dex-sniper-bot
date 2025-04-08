@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { BotError } from '@src/errors/BotError';
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { IncomingMessage, SendMessageOptions } from '@src/types/types';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { strIsPositiveNumber } from '@src/utils/utils';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
-import { strIsPositiveNumber } from '@src/utils/utils';
-import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { IncomingMessage, SendMessageOptions } from '@src/types/types';
 
 @Injectable()
 export class CommandHandler {
@@ -57,9 +58,9 @@ export class CommandHandler {
     const [, tokenAddress] = message.text.split(' ');
 
     try {
-      const userId = await this.redisService.getUserId(message.chatId);
+      const userExists = await this.redisService.existsInSet('users', message.chatId.toString());
 
-      if (!userId) throw new Error('Пользователь не найден');
+      if (!userExists) throw new BotError('User not found', 'Пользователь не найден', 404);
 
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
 
@@ -78,8 +79,8 @@ export class CommandHandler {
         },
       };
     } catch (error) {
-      console.log(`Error while removing token: ${error.message}`);
-      return { text: `${error.message}` };
+      console.log(`Error while adding token: ${error.message}`);
+      throw error;
     }
   }
 
@@ -89,7 +90,7 @@ export class CommandHandler {
       const userSession = await this.redisService.getUser(message.chatId);
 
       if (!userSession.tokens?.length) {
-        throw new Error('У вас нет сохраненных токенов');
+        throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404);
       }
 
       if (tokenAddress) {
@@ -117,7 +118,7 @@ export class CommandHandler {
       };
     } catch (error) {
       console.log(`Error while removing token: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -143,7 +144,7 @@ export class CommandHandler {
       };
     } catch (error) {
       console.log(`Error while subscribing to address: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -166,7 +167,7 @@ export class CommandHandler {
       };
     } catch (error) {
       console.log(`Error while unsubscribing from address: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -177,7 +178,7 @@ export class CommandHandler {
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
       console.log(`Error while getting subscriptions: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -185,7 +186,9 @@ export class CommandHandler {
     try {
       const [, action, limit] = message.text.split(' ');
 
-      if (!strIsPositiveNumber(limit)) throw new Error('Введите корректную команду. Пример: /replicate buy 100');
+      if (!strIsPositiveNumber(limit)) {
+        throw new BotError('Enter correct command', 'Введите корректную команду. Пример: /replicate buy 100', 400);
+      }
 
       isBuySell(action);
 
@@ -194,7 +197,7 @@ export class CommandHandler {
       const subscriptions = await this.redisService.getSubscriptions(message.chatId);
 
       if (!subscriptions?.length) {
-        throw new Error('У вас нет подписок на кошельки');
+        throw new BotError('You have no subscriptions', 'У вас нет подписок на кошельки', 404);
       }
 
       const keyboard = subscriptions.map(sub => {
@@ -207,7 +210,7 @@ export class CommandHandler {
       };
     } catch (error) {
       console.log(`Error while setting replication params: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -220,7 +223,7 @@ export class CommandHandler {
       // TODO: ?
       if (walletAddress && nodeEnv !== 'production') {
         const wallet = wallets?.find(wallet => wallet.address === walletAddress);
-        if (!wallet) throw new Error('Кошелек не найден');
+        if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
 
         const balance = await this.blockchainService.setTestBalance({
           chatId: message.chatId,
@@ -237,8 +240,8 @@ export class CommandHandler {
 
       return { text: 'Выберите кошелек:', options: { reply_markup: { inline_keyboard: keyboard } } };
     } catch (error) {
-      console.log(`Error while removing token: ${error.message}`);
-      return { text: `${error.message}` };
+      console.log(`Error while getting balance: ${error.message}`);
+      throw error;
     }
   }
 
@@ -248,7 +251,9 @@ export class CommandHandler {
 
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
       isEtherAddress(recipientAddress, 'Введите корректный адрес получателя');
-      if (!strIsPositiveNumber(amount)) throw new Error('Введите корректное количество токенов');
+      if (!strIsPositiveNumber(amount)) {
+        throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
+      }
 
       await this.redisService.setUserField(
         message.chatId,
@@ -267,7 +272,7 @@ export class CommandHandler {
       };
     } catch (error) {
       console.log(`Error while sending tokens: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 
@@ -276,17 +281,17 @@ export class CommandHandler {
       const testTokens = await this.redisService.getTestTokens(message.chatId);
 
       if (!testTokens || !testTokens?.length) {
-        throw new Error('У вас нет токенов, чтобы отправить транзакцию');
+        throw new BotError('You have no tokens', 'У вас нет токенов, чтобы отправить транзакцию', 400);
       }
       const testToken = testTokens[0];
 
-      if (!testToken) throw new Error('Токен не найден');
+      if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
       await this.blockchainService.sendFakeTransaction(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
     } catch (error) {
       console.log(`Error while sending fake transaction: ${error.message}`);
-      return { text: `${error.message}` };
+      throw error;
     }
   }
 }

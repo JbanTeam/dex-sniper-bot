@@ -12,6 +12,7 @@ import {
   FilterTokensParams,
   CleanTokenSetsParams,
 } from './types';
+import { BotError } from '@src/errors/BotError';
 
 @Injectable()
 export class RedisService {
@@ -161,7 +162,7 @@ export class RedisService {
 
   async getUser(chatId: number) {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
-    if (!userData) throw new Error('Пользователь не найден');
+    if (!userData) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     return this.parseData<SessionData>(userData);
   }
