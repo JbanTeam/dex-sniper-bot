@@ -1,4 +1,6 @@
-type User = {
+import { IncomingMessage, IncomingQuery } from '@src/types/types';
+
+type TgUser = {
   id: number;
   is_bot: boolean;
   first_name: string;
@@ -7,7 +9,7 @@ type User = {
   language_code?: string;
 };
 
-type Chat = {
+type TgChat = {
   id: number;
   type: 'private' | 'group' | 'supergroup' | 'channel';
   title?: string;
@@ -16,7 +18,7 @@ type Chat = {
   last_name?: string;
 };
 
-type MessageEntity = {
+type TgMessageEntity = {
   type:
     | 'mention'
     | 'hashtag'
@@ -32,8 +34,34 @@ type MessageEntity = {
   offset: number;
   length: number;
   url?: string;
-  user?: User;
+  user?: TgUser;
 };
+
+type TgSendMsgParams = {
+  chatId: number;
+  text: string;
+  options?: TgSendMessageOptions;
+};
+
+type TgDeleteMsgParams = {
+  chatId: number;
+  messageId: number;
+};
+
+type TgSendMessageOptions = {
+  parse_mode?: 'html' | 'markdown' | 'markdownv2';
+  disable_web_page_preview?: boolean;
+  disable_notification?: boolean;
+  reply_markup?: object;
+};
+
+type TgCommandReturnType = {
+  text: string;
+  options?: TgSendMessageOptions;
+};
+
+type TgCommandFunction = (message: IncomingMessage) => Promise<{ text: string; options?: TgSendMessageOptions }>;
+type TgQueryFunction = (query: IncomingQuery) => Promise<{ text: string; options?: TgSendMessageOptions }>;
 
 type InlineKeyboardButton = {
   text: string;
@@ -45,45 +73,51 @@ type InlineKeyboardMarkup = {
   inline_keyboard: InlineKeyboardButton[][];
 };
 
-type Message = {
+type TgMessage = {
   message_id: number;
-  from?: User;
-  chat: Chat;
+  from?: TgUser;
+  chat: TgChat;
   date: number;
   text?: string;
-  entities?: MessageEntity[];
+  entities?: TgMessageEntity[];
   reply_markup?: InlineKeyboardMarkup;
 };
 
-type CallbackQuery = {
+type TgCallbackQuery = {
   id: number;
-  from: User;
-  message?: Message;
+  from: TgUser;
+  message?: TgMessage;
   inline_message_id?: string;
   chat_instance?: string;
   data?: string;
 };
 
-type TelegramUpdate = {
+type TgUpdate = {
   update_id: number;
-  message?: Message;
-  callback_query?: CallbackQuery;
+  message?: TgMessage;
+  callback_query?: TgCallbackQuery;
 };
 
-type TelegramUpdateResponse = {
+type TgUpdateResponse = {
   ok: boolean;
-  result: TelegramUpdate[];
+  result: TgUpdate[];
   description?: string;
 };
 
 export {
-  TelegramUpdateResponse,
-  TelegramUpdate,
-  User,
-  Chat,
-  MessageEntity,
+  TgSendMsgParams,
+  TgDeleteMsgParams,
+  TgSendMessageOptions,
+  TgCommandReturnType,
+  TgCommandFunction,
+  TgQueryFunction,
+  TgUpdateResponse,
+  TgUpdate,
+  TgUser,
+  TgChat,
+  TgMessageEntity,
   InlineKeyboardButton,
   InlineKeyboardMarkup,
-  Message,
-  CallbackQuery,
+  TgMessage,
+  TgCallbackQuery,
 };

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import { BotError } from '@src/errors/BotError';
 import { UserService } from '@modules/user/user.service';
@@ -8,23 +7,26 @@ import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { strIsPositiveNumber } from '@src/utils/utils';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { IncomingMessage } from '@src/types/types';
+import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
 import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
-import { IncomingMessage, SendMessageOptions } from '@src/types/types';
+import { TgCommandFunction, TgCommandReturnType } from '../types/types';
 
 @Injectable()
-export class CommandHandler {
+export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgCommandReturnType> {
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
     private readonly constants: ConstantsProvider,
-    private readonly configService: ConfigService,
-  ) {}
+  ) {
+    super();
+  }
 
-  async handleCommand(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
-    const command = message.text;
+  handleCommand: TgCommandFunction = async message => {
+    const command = message.text.trim();
 
     switch (true) {
       case command.startsWith('/start'):
@@ -52,9 +54,9 @@ export class CommandHandler {
       default:
         return { text: 'Неизвестная команда. Попробуйте /help.' };
     }
-  }
+  };
 
-  private async addToken(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  addToken: TgCommandFunction = async message => {
     const [, tokenAddress] = message.text.split(' ');
 
     try {
@@ -82,9 +84,9 @@ export class CommandHandler {
       console.log(`Error while adding token: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async removeToken(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  removeToken: TgCommandFunction = async message => {
     try {
       const [, tokenAddress] = message.text.split(' ');
       const userSession = await this.redisService.getUser(message.chatId);
@@ -120,9 +122,9 @@ export class CommandHandler {
       console.log(`Error while removing token: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async subscribe(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  subscribe: TgCommandFunction = async message => {
     try {
       const [, walletAddress] = message.text.split(' ');
 
@@ -146,9 +148,9 @@ export class CommandHandler {
       console.log(`Error while subscribing to address: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async unsubscribe(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  unsubscribe: TgCommandFunction = async message => {
     try {
       const [, walletAddress] = message.text.split(' ');
 
@@ -169,9 +171,9 @@ export class CommandHandler {
       console.log(`Error while unsubscribing from address: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async getSubscriptions(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  getSubscriptions: TgCommandFunction = async message => {
     try {
       const reply = await this.subscriptionService.getSubscriptions(message.chatId);
 
@@ -180,9 +182,9 @@ export class CommandHandler {
       console.log(`Error while getting subscriptions: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async replicate(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  replicate: TgCommandFunction = async message => {
     try {
       const [, action, limit] = message.text.split(' ');
 
@@ -212,12 +214,12 @@ export class CommandHandler {
       console.log(`Error while setting replication params: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async getBalance(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  getBalance: TgCommandFunction = async message => {
     try {
       const [, walletAddress] = message.text.split(' ');
-      const nodeEnv = this.configService.get<string>('NODE_ENV');
+      const nodeEnv = this.constants.NODE_ENV;
       const wallets = await this.redisService.getWallets(message.chatId);
 
       // TODO: ?
@@ -243,9 +245,9 @@ export class CommandHandler {
       console.log(`Error while getting balance: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async sendTokens(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  sendTokens: TgCommandFunction = async message => {
     try {
       const [, tokenAddress, amount, recipientAddress] = message.text.split(' ');
 
@@ -274,9 +276,9 @@ export class CommandHandler {
       console.log(`Error while sending tokens: ${error.message}`);
       throw error;
     }
-  }
+  };
 
-  private async sendFakeTransaction(message: IncomingMessage): Promise<{ text: string; options?: SendMessageOptions }> {
+  sendFakeTransaction: TgCommandFunction = async message => {
     try {
       const testTokens = await this.redisService.getTestTokens(message.chatId);
 
@@ -293,5 +295,5 @@ export class CommandHandler {
       console.log(`Error while sending fake transaction: ${error.message}`);
       throw error;
     }
-  }
+  };
 }

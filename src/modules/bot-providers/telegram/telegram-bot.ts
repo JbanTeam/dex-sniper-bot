@@ -1,22 +1,28 @@
 import axios from 'axios';
 import { Injectable, NotFoundException } from '@nestjs/common';
 
+import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { TgCommandHandler } from './handlers/TgCommandHandler';
+import { TgQueryHandler } from './handlers/TgQueryHandler';
+import { TgMessageHandler } from './handlers/TgMessageHandler';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
-import { CallbackQuery, Message, TelegramUpdateResponse } from './types/types';
-import { BotProviderInterface, IncomingMessage, SendMessageOptions, IncomingQuery } from '@src/types/types';
-import { BotError } from '@src/errors/BotError';
+import { BotProviderInterface, IncomingMessage, IncomingQuery } from '@src/types/types';
+import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
 
 @Injectable()
-export class TelegramBot implements BotProviderInterface {
+export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDeleteMsgParams> {
   private TG_URL: string = 'https://api.telegram.org/bot';
 
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly constants: ConstantsProvider,
+    private readonly commandHandler: TgCommandHandler,
+    private readonly queryHandler: TgQueryHandler,
+    private readonly messageHandler: TgMessageHandler,
   ) {
     const token = this.constants.TELEGRAM_BOT_TOKEN;
     this.TG_URL += token;
@@ -27,15 +33,11 @@ export class TelegramBot implements BotProviderInterface {
     });
   }
 
-  async sendMessage({
-    chatId,
-    text,
-    options = {},
-  }: {
-    chatId: number;
-    text: string;
-    options?: SendMessageOptions;
-  }): Promise<void> {
+  async start() {
+    await this.onMessage();
+  }
+
+  async sendMessage({ chatId, text, options = {} }: TgSendMsgParams): Promise<void> {
     const url = `${this.TG_URL}/sendMessage`;
 
     try {
@@ -51,7 +53,7 @@ export class TelegramBot implements BotProviderInterface {
     }
   }
 
-  async deleteMessage({ chatId, messageId }: { chatId: number; messageId: number }): Promise<void> {
+  async deleteMessage({ chatId, messageId }: TgDeleteMsgParams): Promise<void> {
     const url = `${this.TG_URL}/deleteMessage`;
     try {
       await axios.post(url, {
@@ -64,14 +66,14 @@ export class TelegramBot implements BotProviderInterface {
     }
   }
 
-  async onMessage(callback: (message: IncomingMessage | IncomingQuery) => Promise<void>): Promise<void> {
+  async onMessage(): Promise<void> {
     let offset = 0;
 
     while (true) {
       const url = `${this.TG_URL}/getUpdates?offset=${offset}&allowed_updates=["message", "callback_query"]`;
       const response = await axios.get(url);
 
-      const data: TelegramUpdateResponse = response.data as TelegramUpdateResponse;
+      const data: TgUpdateResponse = response.data as TgUpdateResponse;
 
       if (data.ok && data.result.length > 0) {
         for (const update of data.result) {
@@ -79,11 +81,11 @@ export class TelegramBot implements BotProviderInterface {
             if (update.message) {
               const message = this.parseMessage(update.message);
               await this.setSession(update.message);
-              await callback(message);
+              await this.handleIncomingMessage(message);
             } else if (update.callback_query) {
               const query = this.parseQuery(update.callback_query);
               await this.setSession(update.callback_query);
-              await callback(query);
+              await this.handleIncomingMessage(query);
             }
 
             if (update) offset = update.update_id + 1;
@@ -112,7 +114,6 @@ export class TelegramBot implements BotProviderInterface {
 
     await this.redisService.addUser({
       chatId: user.chatId,
-      telegramUserId: user.telegramUserId,
       action: 'get',
       userId: user.id,
       wallets: [...user.wallets],
@@ -122,7 +123,7 @@ export class TelegramBot implements BotProviderInterface {
     await this.sendMessage({ chatId: user.chatId, text: message });
   }
 
-  async setCommands(): Promise<void> {
+  private async setCommands(): Promise<void> {
     const commands = [
       { command: 'start', description: ' Приветствие, функциональность' },
       { command: 'help', description: 'Помощь' },
@@ -152,8 +153,27 @@ export class TelegramBot implements BotProviderInterface {
     console.log('Commands set successfully:', response.data);
   }
 
-  private async setSession(update: Message | CallbackQuery): Promise<void> {
-    const { chatId, telegramUserId } = this.checkUpdate(update);
+  private async handleIncomingMessage(message: IncomingMessage | IncomingQuery) {
+    const response = await this.routeMessage(message);
+    if ('data' in message) {
+      await this.deleteMessage({ chatId: message.chatId, messageId: message.messageId });
+    }
+
+    await this.sendMessage({ chatId: message.chatId, ...response });
+  }
+
+  private async routeMessage(message: IncomingMessage | IncomingQuery) {
+    if ('data' in message) {
+      return this.queryHandler.handleQuery(message);
+    }
+
+    return message.text.startsWith('/')
+      ? this.commandHandler.handleCommand(message)
+      : this.messageHandler.handleMessage(message);
+  }
+
+  private async setSession(update: TgMessage | TgCallbackQuery): Promise<void> {
+    const { chatId } = this.checkUpdate(update);
 
     const userExists = await this.redisService.existsInSet('users', chatId.toString());
 
@@ -164,14 +184,12 @@ export class TelegramBot implements BotProviderInterface {
 
     const { user, action } = await this.userService.getOrCreateUser({
       chatId,
-      telegramUserId,
     });
 
     if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     await this.redisService.addUser({
       chatId,
-      telegramUserId,
       userId: user.id,
       action,
       wallets: [...user.wallets],
@@ -180,23 +198,21 @@ export class TelegramBot implements BotProviderInterface {
     });
   }
 
-  private checkUpdate(update: Message | CallbackQuery): { chatId: number; telegramUserId: number } {
+  private checkUpdate(update: TgMessage | TgCallbackQuery): { chatId: number } {
     if (isMessageUpdate(update)) {
       return {
         chatId: update.chat.id,
-        telegramUserId: update.from?.id || 0,
       };
     } else if (isCallbackQueryUpdate(update)) {
       return {
         chatId: update.message?.chat.id || 0,
-        telegramUserId: update.from.id,
       };
     } else {
       throw new BotError('Unknown update type', 'Ошибка при обработке обновления', 400);
     }
   }
 
-  private parseMessage(message: Message): IncomingMessage {
+  private parseMessage(message: TgMessage): IncomingMessage {
     return {
       chatId: message.chat.id,
       text: message.text || '',
@@ -209,7 +225,7 @@ export class TelegramBot implements BotProviderInterface {
     };
   }
 
-  private parseQuery(query: CallbackQuery): IncomingQuery {
+  private parseQuery(query: TgCallbackQuery): IncomingQuery {
     return {
       query_id: query.id,
       chatId: query?.message?.chat.id || 0,

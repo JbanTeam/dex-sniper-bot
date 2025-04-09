@@ -1,12 +1,13 @@
-import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 
-import { BotProvider } from './bot.provider';
 import { BotError } from '@src/errors/BotError';
+import { BotProviderInterface } from '@src/types/types';
+import { TelegramBot } from './telegram/telegram-bot';
 
 @Injectable()
 export class BotService implements OnModuleInit {
-  private bots: BotProvider[] = [];
-  constructor(@Inject('TelegramBotProvider') private readonly telegramBot: BotProvider) {
+  private bots: BotProviderInterface[] = [];
+  constructor(private readonly telegramBot: TelegramBot) {
     this.bots.push(this.telegramBot);
   }
 
@@ -22,7 +23,7 @@ export class BotService implements OnModuleInit {
           const message = err.incomingMessage;
 
           if ('data' in message) {
-            await bot.deleteMessage(message.chatId, message.messageId);
+            await bot.deleteMessage({ chatId: message.chatId, messageId: message.messageId });
           }
 
           await bot.sendMessage({ chatId: message.chatId, text: err.userMessage });

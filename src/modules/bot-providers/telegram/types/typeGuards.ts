@@ -1,10 +1,10 @@
-import { CallbackQuery, Message } from './types';
+import { TgCallbackQuery, TgMessage } from './types';
 
-function isMessageUpdate(update: Message | CallbackQuery): update is Message {
+function isMessageUpdate(update: TgMessage | TgCallbackQuery): update is TgMessage {
   return 'message_id' in update && 'chat' in update && typeof update.chat.id === 'number';
 }
 
-function isCallbackQueryUpdate(update: Message | CallbackQuery): update is CallbackQuery {
+function isCallbackQueryUpdate(update: TgMessage | TgCallbackQuery): update is TgCallbackQuery {
   return 'id' in update && 'from' in update && typeof update.from.id === 'number';
 }
 

@@ -1,26 +1,30 @@
 import { Injectable } from '@nestjs/common';
 
+import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { strIsPositiveNumber } from '@src/utils/utils';
-import { IncomingQuery, SendMessageOptions } from '@src/types/types';
+import { IncomingQuery } from '@src/types/types';
+import { TgCommandReturnType, TgQueryFunction } from '../types/types';
 import { isBuySell, isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
-import { BotError } from '@src/errors/BotError';
+import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 
 @Injectable()
-export class QueryHandler {
+export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
   constructor(
     private readonly userService: UserService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
     private readonly walletService: WalletService,
-  ) {}
+  ) {
+    super();
+  }
 
-  async handleQuery(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  handleQuery: TgQueryFunction = async query => {
     switch (true) {
       case /^add-(.+)/.test(query.data):
         return this.addTokenCb(query);
@@ -37,9 +41,9 @@ export class QueryHandler {
       default:
         return { text: 'Неизвестная команда' };
     }
-  }
+  };
 
-  private async addTokenCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  addTokenCb: TgQueryFunction = async query => {
     const [, network] = query.data.split('-');
     const userSession = await this.redisService.getUser(query.chatId);
 
@@ -62,9 +66,9 @@ export class QueryHandler {
     });
 
     return { text: reply, options: { parse_mode: 'html' } };
-  }
+  };
 
-  private async removeTokenCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  removeTokenCb: TgQueryFunction = async query => {
     let reply = '';
     const network = query.data.split('-')[1];
     const chatId = query.chatId;
@@ -82,9 +86,9 @@ export class QueryHandler {
     }
 
     return { text: reply, options: { parse_mode: 'html' } };
-  }
+  };
 
-  private async getBalanceCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  getBalanceCb: TgQueryFunction = async query => {
     const walletId = +query.data.split('-')[1];
     const wallets = await this.redisService.getWallets(query.chatId);
     const wallet = wallets?.find(wallet => wallet.id === walletId);
@@ -98,9 +102,9 @@ export class QueryHandler {
     });
 
     return { text: balance, options: { parse_mode: 'html' } };
-  }
+  };
 
-  private async subscribeCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  subscribeCb: TgQueryFunction = async query => {
     const [, network] = query.data.split('-');
 
     const tempWallet = await this.redisService.getTempWallet(query.chatId);
@@ -118,9 +122,9 @@ export class QueryHandler {
     });
 
     return { text: `Кошелек добавлен в список для отслеживания ✅`, options: { parse_mode: 'html' } };
-  }
+  };
 
-  private async sendTokensCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  sendTokensCb: TgQueryFunction = async query => {
     const [, network] = query.data.split('-');
     const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
 
@@ -149,9 +153,9 @@ export class QueryHandler {
     });
 
     return { text: `Токены успешно отправлены ✅`, options: { parse_mode: 'html' } };
-  }
+  };
 
-  private async replicateCb(query: IncomingQuery): Promise<{ text: string; options?: SendMessageOptions }> {
+  replicateCb: TgQueryFunction = async query => {
     const [, subscriptionId] = query.data.split('-');
 
     const tempReplication = await this.redisService.getTempReplication(query.chatId);
@@ -172,5 +176,5 @@ export class QueryHandler {
     });
 
     return { text: `Параметры повтора сделок установлены ✅`, options: { parse_mode: 'html' } };
-  }
+  };
 }

@@ -38,7 +38,7 @@ export class UserService {
     this.notProd = this.nodeEnv !== 'production';
   }
 
-  async getOrCreateUser({ chatId, telegramUserId }: RegisterDto): Promise<{ action: string; user: User | null }> {
+  async getOrCreateUser({ chatId }: RegisterDto): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
     let user = await this.findById({ chatId });
 
@@ -46,7 +46,6 @@ export class UserService {
       user = await this.userRepository.manager.transaction(async entityManager => {
         const createdUser = entityManager.create(User, {
           chatId,
-          telegramUserId,
         });
 
         const savedUser = await entityManager.save(createdUser);
@@ -129,7 +128,6 @@ export class UserService {
         id: true,
         createdAt: true,
         chatId: true,
-        telegramUserId: true,
         tokens: {
           id: true,
           address: true,

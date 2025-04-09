@@ -14,10 +14,6 @@ export class User {
   @IsNumber()
   chatId: number;
 
-  @Column({ unique: true, type: 'bigint' })
-  @IsNumber()
-  telegramUserId: number;
-
   @CreateDateColumn()
   createdAt: Date;
 
