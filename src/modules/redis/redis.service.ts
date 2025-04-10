@@ -2,8 +2,7 @@ import Redis from 'ioredis';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { Network, SessionData, SessionSubscription, SessionUserToken, SessionWallet } from '@src/types/types';
-import { Address } from 'viem';
+import { Network, SessionData, SessionSubscription, SessionUserToken, SessionWallet, Address } from '@src/types/types';
 import {
   SubscriptionParams,
   AddTokenParams,
@@ -206,17 +205,12 @@ export class RedisService {
     return JSON.parse(userData) as SessionWallet[];
   }
 
-  async getTokens(chatId: number): Promise<SessionUserToken[] | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'testTokens');
+  async getTokens(chatId: number, prefix: string): Promise<SessionUserToken[] | null> {
+    const userData = await this.redisClient.hget(`user:${chatId}`, prefix);
     if (!userData) return null;
     return JSON.parse(userData) as SessionUserToken[];
   }
 
-  async getTestTokens(chatId: number): Promise<SessionUserToken[] | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'testTokens');
-    if (!userData) return null;
-    return JSON.parse(userData) as SessionUserToken[];
-  }
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {
     const userData = await this.redisClient.hget(`user:${chatId}`, 'subscriptions');
     if (!userData) return null;
@@ -240,12 +234,8 @@ export class RedisService {
     const usersIds = await this.redisClient.smembers('users');
     return usersIds;
   }
-  async getTokensSet(network: Network) {
-    const tokens = await this.redisClient.smembers(`tokens:${network}`);
-    return tokens;
-  }
-  async getTestTokensSet(network: Network) {
-    const tokens = await this.redisClient.smembers(`testTokens:${network}`);
+  async getTokensSet(network: Network, prefix: string) {
+    const tokens = await this.redisClient.smembers(`${prefix}:${network}`);
     return tokens;
   }
 

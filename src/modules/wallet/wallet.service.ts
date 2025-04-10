@@ -3,8 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Wallet } from './wallet.entity';
-import { Network } from '@src/types/types';
-import { Address } from 'viem';
+import { Network, Address } from '@src/types/types';
 
 @Injectable()
 export class WalletService {

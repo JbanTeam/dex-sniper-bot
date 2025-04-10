@@ -19,6 +19,7 @@ import {
   UpdateTokenStorageParams,
 } from './types';
 import { BotError } from '@src/errors/BotError';
+import { isNetwork } from '@src/types/typeGuards';
 
 @Injectable()
 export class UserService {
@@ -50,13 +51,13 @@ export class UserService {
 
         const savedUser = await entityManager.save(createdUser);
 
-        // TODO: в зависимости от сети
         const networksArr = Object.keys(Network);
         await Promise.all(
           networksArr.map(network => {
+            isNetwork(network);
             return this.blockchainService.createWallet({
               userId: savedUser.id,
-              network: network as Network,
+              network: network,
               entityManager,
             });
           }),

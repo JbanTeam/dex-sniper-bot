@@ -36,7 +36,7 @@ export class ConstantsProvider {
   public readonly exchangeAddresses: ExchangesType = {} as ExchangesType;
   public readonly databaseConfig: TypeOrmModuleOptions;
 
-  constructor(private configService: ConfigService) {
+  constructor(private readonly configService: ConfigService) {
     this.NODE_ENV = this.getConfigValue('NODE_ENV', 'development');
     this.PORT = this.getConfigValue('PORT', '3000');
     this.DB_USER = this.getConfigValue('DB_USER', 'postgres');
@@ -117,6 +117,6 @@ export class ConstantsProvider {
 
   private getConfigValue(key: string, defaultValue: string): string {
     const value = this.configService.get<string>(key);
-    return value !== undefined ? value : defaultValue;
+    return value ?? defaultValue;
   }
 }

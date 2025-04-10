@@ -4,7 +4,6 @@ import {
   createWalletClient,
   createPublicClient,
   http,
-  Address,
   formatUnits,
   parseUnits,
   createTestClient,
@@ -19,7 +18,7 @@ import { coinContract } from './coin-contract';
 import { anvilAbi } from '@src/utils/constants';
 import { BotError } from '@src/errors/BotError';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { Network, SessionUserToken } from '@src/types/types';
+import { Network, SessionUserToken, Address, ViemNetwork } from '@src/types/types';
 import {
   TestBalanceParams,
   SendTestTokenParams,
@@ -27,13 +26,14 @@ import {
   ViemClientsType,
   DeployContractParams,
 } from '../types';
+import { isNetwork } from '@src/types/typeGuards';
 
 @Injectable()
 export class AnvilProvider {
-  private walletClient: WalletClient;
-  private publicClient: PublicClient;
-  private rpcUrl: string;
-  private rpcWsUrl: string;
+  private readonly walletClient: WalletClient;
+  private readonly publicClient: PublicClient;
+  private readonly rpcUrl: string;
+  private readonly rpcWsUrl: string;
 
   constructor(private readonly constants: ConstantsProvider) {
     this.rpcUrl = this.constants.ANVIL_RPC_URL;
@@ -49,10 +49,12 @@ export class AnvilProvider {
   }
 
   createClients(): ViemClientsType {
-    const chainsArr = Object.entries(this.constants.chains);
+    const chainsArr = Object.keys(ViemNetwork);
 
     return chainsArr.reduce(
-      (clients, [keyNetwork, value]) => {
+      (clients, keyNetwork) => {
+        isNetwork(keyNetwork);
+        const value = this.constants.chains[keyNetwork];
         clients.public[keyNetwork] = createPublicClient({
           chain: value.chain,
           transport: http(this.rpcUrl),

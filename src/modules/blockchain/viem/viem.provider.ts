@@ -1,5 +1,4 @@
 import { anvil } from 'viem/chains';
-import { ConfigService } from '@nestjs/config';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
@@ -7,7 +6,6 @@ import {
   createWalletClient,
   createPublicClient,
   http,
-  Address,
   ContractFunctionExecutionError,
   formatEther,
   formatUnits,
@@ -16,25 +14,26 @@ import {
   parseUnits,
 } from 'viem';
 
-import { Network } from '@src/types/types';
+import { BotError } from '@src/errors/BotError';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { RedisService } from '@modules/redis/redis.service';
 import { decodeLogAddress } from '@src/utils/utils';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { Network, ViemNetwork } from '@src/types/types';
 import { decryptPrivateKey, encryptPrivateKey } from '@src/utils/crypto';
-import { isEtherAddressArr, isNetworkArr } from '@src/types/typeGuards';
+import { isEtherAddressArr, isNetwork, isNetworkArr } from '@src/types/typeGuards';
 import { anvilAbi, erc20Abi, erc20TransferEvent } from '@src/utils/constants';
+import { SendTransactionParams, ViemClientsType } from './types';
 import {
   BalanceInfo,
+  CheckTokenParams,
+  CheckTokenReturnType,
   GetBalanceParams,
   GetTokenBalanceParams,
   SendTokensParams,
-  SendTransactionParams,
   TokenBalanceReturnType,
   Transaction,
-  ViemClientsType,
-} from './types';
-import { BotError } from '@src/errors/BotError';
+} from '../types';
 
 @Injectable()
 export class ViemProvider implements OnModuleInit {
@@ -46,25 +45,24 @@ export class ViemProvider implements OnModuleInit {
 
   constructor(
     private readonly redisService: RedisService,
-    private readonly configService: ConfigService,
     private readonly anvilProvider: AnvilProvider,
     private readonly constants: ConstantsProvider,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.nodeEnv = this.constants.NODE_ENV;
     this.notProd = this.nodeEnv !== 'production';
 
     if (this.notProd) this.anvilClients = this.anvilProvider.createClients();
 
     this.clients = this.createClients();
-    this.unwatchCallbacks = {} as { [key in Network]: () => void };
-    Object.keys(this.constants.chains).forEach(network => {
+    this.unwatchCallbacks = {} as { [key in ViemNetwork]: () => void };
+    Object.keys(ViemNetwork).forEach(network => {
       this.unwatchCallbacks[network] = () => {};
     });
   }
 
   onModuleInit() {
-    const networkKeys = Object.keys(this.constants.chains);
+    const networkKeys = Object.keys(ViemNetwork);
     isNetworkArr(networkKeys);
 
     for (const network of networkKeys) {
@@ -89,13 +87,7 @@ export class ViemProvider implements OnModuleInit {
     };
   }
 
-  async checkToken({
-    address,
-    network,
-  }: {
-    address: Address;
-    network: Network;
-  }): Promise<{ name: string; symbol: string; decimals: number }> {
+  async checkToken({ address, network }: CheckTokenParams): Promise<CheckTokenReturnType> {
     const publicClient = this.clients.public[network];
 
     try {
@@ -130,8 +122,8 @@ export class ViemProvider implements OnModuleInit {
     const formattedNativeBalance = formatEther(nativeBalance);
 
     let tokens = this.notProd
-      ? (await this.redisService.getTestTokens(chatId)) || []
-      : (await this.redisService.getTokens(chatId)) || [];
+      ? (await this.redisService.getTokens(chatId, 'testTokens')) || []
+      : (await this.redisService.getTokens(chatId, 'tokens')) || [];
 
     tokens = tokens.filter(t => t.network === network);
 
@@ -205,8 +197,8 @@ export class ViemProvider implements OnModuleInit {
     }
 
     const tokensAddresses = this.notProd
-      ? await this.redisService.getTestTokensSet(network)
-      : await this.redisService.getTokensSet(network);
+      ? await this.redisService.getTokensSet(network, 'testTokens')
+      : await this.redisService.getTokensSet(network, 'tokens');
     const client = this.notProd ? this.anvilClients.publicWebsocket[network] : this.clients.publicWebsocket[network];
 
     isEtherAddressArr(tokensAddresses);
@@ -266,10 +258,12 @@ export class ViemProvider implements OnModuleInit {
   }
 
   private createClients(): ViemClientsType {
-    const chainsArr = Object.entries(this.constants.chains);
+    const chainsArr = Object.keys(ViemNetwork);
 
     return chainsArr.reduce(
-      (clients, [keyNetwork, value]) => {
+      (clients, keyNetwork) => {
+        isNetwork(keyNetwork);
+        const value = this.constants.chains[keyNetwork];
         clients.public[keyNetwork] = createPublicClient({
           chain: value.chain,
           transport: http(value.rpcUrl),
@@ -325,7 +319,7 @@ export class ViemProvider implements OnModuleInit {
         account,
       });
 
-      console.log('Transaction hash:', hash);
+      console.log('#️⃣ Transaction hash:', hash);
 
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
 

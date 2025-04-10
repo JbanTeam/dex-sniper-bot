@@ -2,6 +2,7 @@ import { Chain } from 'viem';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
+import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 
 export interface BotProviderInterface<SendMsgParams = any, DeleteMsgParams = any> {
   start(): Promise<void>;
@@ -26,12 +27,28 @@ export type IncomingQuery = Omit<IncomingMessage, 'text'> & {
   query_id: number;
 };
 
-export enum Network {
-  BSC = 'BSC',
-  POLYGON = 'POLYGON',
-}
+export type Address = `0x${string}`;
 
-export type ChainConfig = {
+export const ViemNetwork = {
+  BSC: 'BSC',
+  POLYGON: 'POLYGON',
+} as const;
+
+export const SolanaNetwork = {
+  // SOLANA: 'SOLANA',
+} as const;
+
+export const Network = {
+  ...ViemNetwork,
+  ...SolanaNetwork,
+} as const;
+
+export type Network = (typeof Network)[keyof typeof Network];
+export type ViemNetwork = (typeof ViemNetwork)[keyof typeof ViemNetwork];
+
+export type NetworkProviders = Record<Network, ViemProvider>;
+
+export type ViemChainConfig = {
   name: string;
   rpcUrl: string;
   rpcWsUrl: string;
@@ -40,20 +57,20 @@ export type ChainConfig = {
     name: string;
     symbol: string;
     decimals: number;
-    address: `0x${string}`;
+    address: Address;
   };
   exchange: string;
-  exchangeAddress: `0x${string}`;
+  exchangeAddress: Address;
 };
 
 export type ChainsType = {
-  [key in Network]: ChainConfig;
+  [key in Network]: ViemChainConfig;
 };
 
 export type ExchangesType = {
   [key in Network]: {
-    exchangeAddress: `0x${string}`;
-    testAddress: `0x${string}`;
+    exchangeAddress: Address;
+    testAddress: Address;
   };
 };
 

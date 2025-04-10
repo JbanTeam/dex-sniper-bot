@@ -1,5 +1,4 @@
-import { Address } from 'viem';
-import { Network, SessionData, SessionUserToken } from '@src/types/types';
+import { Address, Network, SessionData, SessionUserToken } from '@src/types/types';
 
 export type AddTokenParams = {
   userSession: SessionData;

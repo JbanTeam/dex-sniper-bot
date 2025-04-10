@@ -1,19 +1,18 @@
-import { Address } from 'viem';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
-import { User } from '@modules/user/user.entity';
 import { Subscription } from './subscription.entity';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { RedisService } from '@modules/redis/redis.service';
-import { ConfigService } from '@nestjs/config';
-import { Transaction } from '@modules/blockchain/viem/types';
-import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UpdateSubscriptionParams } from './types';
-import { Network, SessionSubscription } from '@src/types/types';
+import { BlockchainService } from '../blockchain/blockchain.service';
+import { User } from '@modules/user/user.entity';
+import { RedisService } from '@modules/redis/redis.service';
+import { Transaction } from '@modules/blockchain/types';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BotError } from '@src/errors/BotError';
+import { Address, Network, SessionSubscription } from '@src/types/types';
 
 @Injectable()
 export class SubscriptionService {

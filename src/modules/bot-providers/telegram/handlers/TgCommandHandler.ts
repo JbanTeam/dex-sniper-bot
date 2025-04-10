@@ -218,23 +218,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   getBalance: TgCommandFunction = async message => {
     try {
-      const [, walletAddress] = message.text.split(' ');
-      const nodeEnv = this.constants.NODE_ENV;
       const wallets = await this.redisService.getWallets(message.chatId);
-
-      // TODO: ?
-      if (walletAddress && nodeEnv !== 'production') {
-        const wallet = wallets?.find(wallet => wallet.address === walletAddress);
-        if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
-
-        const balance = await this.blockchainService.setTestBalance({
-          chatId: message.chatId,
-          network: wallet.network,
-          address: wallet.address,
-        });
-
-        return { text: balance, options: { parse_mode: 'html' } };
-      }
 
       const keyboard = wallets?.map(wallet => {
         return [{ text: `${wallet.network}: ${wallet.address}`, callback_data: `balance-${wallet.id}` }];
@@ -280,9 +264,9 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   sendFakeTransaction: TgCommandFunction = async message => {
     try {
-      const testTokens = await this.redisService.getTestTokens(message.chatId);
+      const testTokens = await this.redisService.getTokens(message.chatId, 'testTokens');
 
-      if (!testTokens || !testTokens?.length) {
+      if (!testTokens?.length) {
         throw new BotError('You have no tokens', 'У вас нет токенов, чтобы отправить транзакцию', 400);
       }
       const testToken = testTokens[0];

@@ -1,14 +1,14 @@
-import { Address, PublicClient } from 'viem';
+import { PublicClient } from 'viem';
 
-import { Network, SessionUserToken } from '@src/types/types';
 import { Wallet } from '@modules/wallet/wallet.entity';
+import { Address, SessionUserToken, ViemNetwork } from '@src/types/types';
 
 type ViemClientsType = {
   public: {
-    [key in Network]: PublicClient;
+    [key in ViemNetwork]: PublicClient;
   };
   publicWebsocket: {
-    [key in Network]: PublicClient;
+    [key in ViemNetwork]: PublicClient;
   };
 };
 
@@ -23,27 +23,6 @@ type DeployContractParams = {
   symbol: string;
   decimals: number;
   count: string;
-};
-
-type GetBalanceParams = {
-  chatId: number;
-  address: Address;
-  network: Network;
-};
-
-type GetTokenBalanceParams = {
-  tokenAddress: Address;
-  walletAddress: Address;
-  network: Network;
-};
-
-type TokenBalanceReturnType = { symbol: string; amount: string; decimals: number };
-
-type SendTokensParams = {
-  wallet: Wallet;
-  tokenAddress: Address;
-  amount: string;
-  recipientAddress: Address;
 };
 
 type SendTransactionParams = {
@@ -68,41 +47,11 @@ type SendTestTokenParams = {
   decimals: number;
 };
 
-type Transaction = {
-  hash: Address;
-  from: Address;
-  to: Address;
-  contractAddress: Address;
-  value: string;
-  data: string;
-  network: Network;
-};
-
-type BalanceInfo = {
-  address: Address;
-  network: Network;
-  nativeBalance: {
-    symbol: string;
-    amount: string;
-  };
-  tokenBalances: Array<{
-    symbol: string;
-    amount: string;
-    decimals: number;
-  }>;
-};
-
 export {
   ViemClientsType,
   DeployTestContractParams,
   DeployContractParams,
-  GetBalanceParams,
-  GetTokenBalanceParams,
-  TokenBalanceReturnType,
   TestBalanceParams,
-  SendTokensParams,
   SendTransactionParams,
   SendTestTokenParams,
-  Transaction,
-  BalanceInfo,
 };
