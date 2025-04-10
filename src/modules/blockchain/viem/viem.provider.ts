@@ -229,7 +229,13 @@ export class ViemProvider implements OnModuleInit {
     Object.values(this.unwatchCallbacks).forEach(unwatch => unwatch());
   }
 
-  async sendTokens({ wallet, tokenAddress, amount, recipientAddress }: SendTokensParams) {
+  async sendTokens({ userSession, wallet, token, amount, recipientAddress }: SendTokensParams) {
+    let tokenAddress = token.address;
+    if (this.notProd) {
+      const testToken = userSession.testTokens?.find(t => t.id === token.id);
+      if (testToken) tokenAddress = testToken.address;
+    }
+
     const {
       symbol,
       amount: balance,

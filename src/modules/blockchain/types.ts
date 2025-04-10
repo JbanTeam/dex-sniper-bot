@@ -1,7 +1,7 @@
 import { EntityManager } from 'typeorm';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
-import { Address, Network, SessionUserToken, SessionWallet } from '@src/types/types';
+import { Address, Network, SessionData, SessionUserToken, SessionWallet } from '@src/types/types';
 
 type CreateWalletParams = {
   userId: number;
@@ -31,8 +31,9 @@ type GetTokenBalanceParams = {
 type TokenBalanceReturnType = { symbol: string; amount: string; decimals: number };
 
 type SendTokensParams = {
+  userSession: SessionData;
   wallet: Wallet;
-  tokenAddress: Address;
+  token: SessionUserToken;
   amount: string;
   recipientAddress: Address;
 };

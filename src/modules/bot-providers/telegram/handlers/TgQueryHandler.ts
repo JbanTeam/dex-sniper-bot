@@ -141,13 +141,18 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     const userSession = await this.redisService.getUser(query.chatId);
     const wallet = userSession.wallets.find(wallet => wallet.network === network);
     if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+    const token = userSession.tokens.find(token => token.address === tokenAddress);
+    if (!token) {
+      throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
+    }
 
     const fullWallet = await this.walletService.findByAddress(wallet.address);
     if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
 
     await this.blockchainService.sendTokens({
+      userSession,
       wallet: fullWallet,
-      tokenAddress,
+      token,
       amount,
       recipientAddress,
     });
