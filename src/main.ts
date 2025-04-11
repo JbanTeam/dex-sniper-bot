@@ -1,18 +1,12 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 
 import { AppModule } from './app.module';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { GlobalExceptionFilter } from './errors/global-exceptions.filter';
 
 async function start() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api');
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-    }),
-  );
-
+  app.useGlobalFilters(new GlobalExceptionFilter());
   const constants = app.get(ConstantsProvider);
 
   await app.listen(constants.PORT);
@@ -21,4 +15,6 @@ async function start() {
 
 start()
   .then(({ port }) => console.log(`Server started on ${port}`))
-  .catch(console.error);
+  .catch(err => {
+    console.log(err);
+  });

@@ -26,14 +26,10 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   ) {
     const token = this.constants.TELEGRAM_BOT_TOKEN;
     this.TG_URL += token;
-
-    this.setCommands().catch(error => {
-      console.error('Error setting commands:', error);
-      throw error;
-    });
   }
 
   async start() {
+    await this.setCommands();
     await this.onMessage();
   }
 
@@ -49,20 +45,18 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       });
     } catch (error) {
       console.log('Error while sending message:', error);
-      throw error;
     }
   }
 
   async deleteMessage({ chatId, messageId }: TgDeleteMsgParams): Promise<void> {
-    const url = `${this.TG_URL}/deleteMessage`;
     try {
+      const url = `${this.TG_URL}/deleteMessage`;
       await axios.post(url, {
         chat_id: chatId,
         message_id: messageId,
       });
     } catch (error) {
       console.log('Error while deleting message:', error);
-      throw error;
     }
   }
 
@@ -77,50 +71,47 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
       if (data.ok && data.result.length > 0) {
         for (const update of data.result) {
-          try {
-            if (update.message) {
-              const message = this.parseMessage(update.message);
-              await this.setSession(update.message);
-              await this.handleIncomingMessage(message);
-            } else if (update.callback_query) {
-              const query = this.parseQuery(update.callback_query);
-              await this.setSession(update.callback_query);
-              await this.handleIncomingMessage(query);
-            }
-
-            if (update) offset = update.update_id + 1;
-          } catch (error) {
-            if (error instanceof BotError) {
-              if (update.message) error.incomingMessage = this.parseMessage(update.message);
-              if (update.callback_query) error.incomingMessage = this.parseQuery(update.callback_query);
-            }
-            throw error;
+          if (update.message) {
+            const message = this.parseMessage(update.message);
+            await this.setSession(update.message);
+            await this.handleIncomingMessage(message);
+          } else if (update.callback_query) {
+            const query = this.parseQuery(update.callback_query);
+            await this.setSession(update.callback_query);
+            await this.handleIncomingMessage(query);
           }
+
+          if (update) offset = update.update_id + 1;
         }
       }
     }
   }
 
   async notifyUser({ userId, chatId, message }: { userId: number; chatId: number; message: string }) {
-    const usersIds = await this.redisService.getUsersSet();
-    if (!usersIds.includes(chatId.toString())) {
-      return await this.sendMessage({ chatId, text: message });
-    }
+    try {
+      const usersIds = await this.redisService.getUsersSet();
+      if (!usersIds.includes(chatId.toString())) {
+        return await this.sendMessage({ chatId, text: message });
+      }
 
-    const user = await this.userService.findById({ id: userId });
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+      const user = await this.userService.findById({ id: userId });
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
 
-    await this.redisService.addUser({
-      chatId: user.chatId,
-      action: 'get',
-      userId: user.id,
-      wallets: [...user.wallets],
-      tokens: [...user.tokens],
-      subscriptions: [...user.subscriptions],
-    });
-    await this.sendMessage({ chatId: user.chatId, text: message });
+      await this.redisService.addUser({
+        chatId: user.chatId,
+        action: 'get',
+        userId: user.id,
+        wallets: [...user.wallets],
+        tokens: [...user.tokens],
+        subscriptions: [...user.subscriptions],
+      });
+      await this.sendMessage({ chatId: user.chatId, text: message });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error notifying user: ${message}`);
+    }
   }
 
   private async setCommands(): Promise<void> {
@@ -129,11 +120,12 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       { command: 'help', description: 'Помощь' },
       { command: 'addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
       { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
+      { command: 'mytokens', description: 'Посмотреть мои токены' },
       { command: 'follow', description: 'Подписаться на кошелек, /follow [адрес_кошелька]' },
       { command: 'unfollow', description: 'Отписаться от кошелька, /unfollow [адрес_кошелька]' },
+      { command: 'subscriptions', description: 'Посмотреть мои подписки' },
       { command: 'replicate', description: 'Установить какие сделки повторять, /replicate [buy/sell] [лимит суммы]' },
       { command: 'balance', description: 'Посмотреть баланс' },
-      { command: 'subscriptions', description: 'Посмотреть мои подписки' },
       { command: 'send', description: 'Отправить токены, /send [адрес токена] [сумма] [адрес получателя]' },
     ];
 
@@ -144,13 +136,18 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       language_code: 'ru',
     };
 
-    const response = await axios.post(url, body);
+    try {
+      const response = await axios.post(url, body);
 
-    if (!response.data.ok) {
-      throw new BotError('Failed to set commands', 'Не удалось установить команды', 400);
+      if (!response.data.ok) {
+        throw new BotError('Failed to set commands', 'Не удалось установить команды', 400);
+      }
+
+      console.log('Commands set successfully:', response.data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error setting commands: ${message}`);
     }
-
-    console.log('Commands set successfully:', response.data);
   }
 
   private async handleIncomingMessage(message: IncomingMessage | IncomingQuery) {
@@ -173,29 +170,34 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   }
 
   private async setSession(update: TgMessage | TgCallbackQuery): Promise<void> {
-    const { chatId } = this.checkUpdate(update);
+    try {
+      const { chatId } = this.checkUpdate(update);
 
-    const userExists = await this.redisService.existsInSet('users', chatId.toString());
+      const userExists = await this.redisService.existsInSet('users', chatId.toString());
 
-    if (userExists) {
-      await this.redisService.setUserField(chatId, 'action', 'get');
-      return;
+      if (userExists) {
+        await this.redisService.setUserField(chatId, 'action', 'get');
+        return;
+      }
+
+      const { user, action } = await this.userService.getOrCreateUser({
+        chatId,
+      });
+
+      if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
+
+      await this.redisService.addUser({
+        chatId,
+        userId: user.id,
+        action,
+        wallets: [...user.wallets],
+        tokens: [...user.tokens],
+        subscriptions: [...user.subscriptions],
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Error setting session: ${message}`);
     }
-
-    const { user, action } = await this.userService.getOrCreateUser({
-      chatId,
-    });
-
-    if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
-
-    await this.redisService.addUser({
-      chatId,
-      userId: user.id,
-      action,
-      wallets: [...user.wallets],
-      tokens: [...user.tokens],
-      subscriptions: [...user.subscriptions],
-    });
   }
 
   private checkUpdate(update: TgMessage | TgCallbackQuery): { chatId: number } {

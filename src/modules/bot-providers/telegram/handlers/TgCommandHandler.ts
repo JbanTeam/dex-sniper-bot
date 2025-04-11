@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { UserService } from '@modules/user/user.service';
@@ -11,7 +11,7 @@ import { IncomingMessage } from '@src/types/types';
 import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
 import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
-import { TgCommandFunction, TgCommandReturnType } from '../types/types';
+import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
 
 @Injectable()
 export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgCommandReturnType> {
@@ -22,7 +22,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
     private readonly subscriptionService: SubscriptionService,
     private readonly constants: ConstantsProvider,
   ) {
-    super();
+    const logger = new Logger(TgCommandHandler.name);
+    super(logger);
   }
 
   handleCommand: TgCommandFunction = async message => {
@@ -35,6 +36,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         return this.addToken(message);
       case command.startsWith('/removetoken'):
         return this.removeToken(message);
+      case command.startsWith('/mytokens'):
+        return this.getTokens(message);
       case command.startsWith('/balance'):
         return this.getBalance(message);
       case command.startsWith('/follow'):
@@ -81,8 +84,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         },
       };
     } catch (error) {
-      console.log(`Error while adding token: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while adding token', 'Ошибка при добавлении токена');
     }
   };
 
@@ -119,8 +121,17 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         },
       };
     } catch (error) {
-      console.log(`Error while removing token: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while removing token', 'Ошибка при удалении токена');
+    }
+  };
+
+  getTokens: TgCommandFunction = async message => {
+    try {
+      const reply = await this.userService.getTokens(message.chatId);
+
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while getting tokens', 'Ошибка при получении токенов');
     }
   };
 
@@ -145,8 +156,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         },
       };
     } catch (error) {
-      console.log(`Error while subscribing to address: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while subscribing to address', 'Ошибка при подписке на кошелек');
     }
   };
 
@@ -168,8 +178,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         },
       };
     } catch (error) {
-      console.log(`Error while unsubscribing from address: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while unsubscribing from address', 'Ошибка при отписке от кошелька');
     }
   };
 
@@ -179,8 +188,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
-      console.log(`Error while getting subscriptions: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while getting subscriptions', 'Ошибка при получении подписок');
     }
   };
 
@@ -211,8 +219,11 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         options: { reply_markup: { inline_keyboard: keyboard } },
       };
     } catch (error) {
-      console.log(`Error while setting replication params: ${error.message}`);
-      throw error;
+      return this.handleError(
+        error,
+        'Error while setting replication params',
+        'Ошибка при установке параметров повтора сделок',
+      );
     }
   };
 
@@ -226,8 +237,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       return { text: 'Выберите кошелек:', options: { reply_markup: { inline_keyboard: keyboard } } };
     } catch (error) {
-      console.log(`Error while getting balance: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while getting balance', 'Ошибка при получении баланса');
     }
   };
 
@@ -257,12 +267,25 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         options: { reply_markup: { inline_keyboard: keyboard } },
       };
     } catch (error) {
-      console.log(`Error while sending tokens: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while sending tokens', 'Ошибка при отправке токенов');
     }
   };
 
-  sendFakeTransaction: TgCommandFunction = async message => {
+  handleError(error: unknown, errMsg: string, userMsg: string): { text: string; options?: TgSendMessageOptions } {
+    this.logger.error(`${errMsg}`, error);
+
+    if (error instanceof BotError) {
+      return { text: error.userMessage, options: { parse_mode: 'html' } };
+    }
+
+    return { text: userMsg, options: { parse_mode: 'html' } };
+  }
+
+  private sendFakeTransaction: TgCommandFunction = async message => {
+    if (this.constants.NODE_ENV === 'production') {
+      return { text: 'Неизвестная команда, попробуйте /help' };
+    }
+
     try {
       const testTokens = await this.redisService.getTokens(message.chatId, 'testTokens');
 
@@ -276,8 +299,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
     } catch (error) {
-      console.log(`Error while sending fake transaction: ${error.message}`);
-      throw error;
+      return this.handleError(error, 'Error while sending fake transaction', 'Ошибка при отправке транзакции');
     }
   };
 }

@@ -83,6 +83,21 @@ export class UserService {
     return { tokens };
   }
 
+  async getTokens(chatId: number): Promise<string> {
+    const userSession = await this.redisService.getUser(chatId);
+    if (!userSession.tokens.length) {
+      throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404);
+    }
+
+    let reply = `<u>Ваши токены:</u>\n`;
+
+    userSession.tokens.forEach((token, index) => {
+      reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
+    });
+
+    return reply;
+  }
+
   async removeToken({ chatId, address, network }: RemoveTokenParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
