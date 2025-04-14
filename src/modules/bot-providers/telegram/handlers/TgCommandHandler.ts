@@ -202,16 +202,24 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       isBuySell(action);
 
-      await this.redisService.setUserField(message.chatId, 'tempReplication', `${action}:${limit}`);
+      const userSession = await this.redisService.getUser(message.chatId);
 
-      const subscriptions = await this.redisService.getSubscriptions(message.chatId);
-
-      if (!subscriptions?.length) {
+      if (!userSession.subscriptions?.length) {
         throw new BotError('You have no subscriptions', 'У вас нет подписок на кошельки', 404);
       }
 
-      const keyboard = subscriptions.map(sub => {
-        return [{ text: `${sub.network}: ${sub.address}`, callback_data: `sub-${sub.id}` }];
+      if (!userSession.tokens.length) {
+        throw new BotError('You have no tokens', 'Сначала добавьте токены', 404);
+      }
+
+      await this.redisService.setUserField(
+        message.chatId,
+        'tempReplication',
+        JSON.stringify({ action, limit, chatId: message.chatId, userId: userSession.userId }),
+      );
+
+      const keyboard = userSession.subscriptions.map(sub => {
+        return [{ text: `${sub.network}: ${sub.address}`, callback_data: `repl-${sub.id}-${sub.network}` }];
       });
 
       return {

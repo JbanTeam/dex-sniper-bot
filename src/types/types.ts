@@ -74,6 +74,16 @@ export type ExchangesType = {
   };
 };
 
+export type TempReplication = {
+  action: 'buy' | 'sell';
+  limit: number;
+  userId?: number;
+  chatId?: number;
+  network?: Network;
+  subscriptionId?: number;
+  tokenId?: number;
+};
+
 export interface SessionData {
   userId: number;
   chatId: number;
@@ -81,13 +91,27 @@ export interface SessionData {
   tokens: SessionUserToken[];
   testTokens?: SessionUserToken[];
   subscriptions: SessionSubscription[];
+  replications: SessionReplication[];
   action?: string;
   tempToken?: string;
   tempWallet?: string;
-  tempReplication?: string;
+  tempReplication?: TempReplication;
   tempSendTokens?: string;
 }
 
-export type SessionUserToken = Omit<UserToken, 'user'>;
+export type SessionUserToken = Omit<UserToken, 'user' | 'replications'>;
 export type SessionWallet = Omit<Wallet, 'user'>;
-export type SessionSubscription = Omit<Subscription, 'user'>;
+export type SessionSubscription = Omit<Subscription, 'user' | 'replications'>;
+export type SessionReplication = {
+  id: number;
+  chatId: number;
+  userId: number;
+  buy: number;
+  sell: number;
+  network: Network;
+  tokenId: number;
+  tokenSymbol: string;
+  tokenAddress: Address;
+  subscriptionId: number;
+  subscriptionAddress: Address;
+};

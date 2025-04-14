@@ -9,7 +9,7 @@ import { WalletService } from '@modules/wallet/wallet.service';
 import { strIsPositiveNumber } from '@src/utils/utils';
 import { IncomingQuery } from '@src/types/types';
 import { TgCommandReturnType, TgQueryFunction } from '../types/types';
-import { isBuySell, isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
+import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 
 @Injectable()
@@ -34,7 +34,9 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
         return this.getBalanceCb(query);
       case /^subnet-(.+)/.test(query.data):
         return this.subscribeCb(query);
-      case /^sub-(.+)/.test(query.data):
+      case /^repl-(.+)-(.+)/.test(query.data):
+        return this.replicateSetSubscription(query);
+      case /^repltoken-(.+)/.test(query.data):
         return this.replicateCb(query);
       case /^send-(.+)/.test(query.data):
         return this.sendTokensCb(query);
@@ -161,25 +163,36 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   };
 
   replicateCb: TgQueryFunction = async query => {
-    const [, subscriptionId] = query.data.split('-');
+    const [, tokenId] = query.data.split('-');
+    const tempReplication = await this.redisService.getTempReplication(query.chatId);
+    if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
+
+    tempReplication.tokenId = +tokenId;
+    const reply = await this.subscriptionService.createOrUpdateReplication(tempReplication);
+
+    return { text: `Параметры повтора сделок установлены ✅\n\n${reply}`, options: { parse_mode: 'html' } };
+  };
+
+  private replicateSetSubscription: TgQueryFunction = async query => {
+    const [, subscriptionId, network] = query.data.split('-');
+    isNetwork(network);
 
     const tempReplication = await this.redisService.getTempReplication(query.chatId);
     if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
 
-    const [action, limit] = tempReplication.split(':');
-    isBuySell(action);
+    tempReplication.subscriptionId = +subscriptionId;
+    tempReplication.network = network;
+    await this.redisService.setUserField(query.chatId, 'tempReplication', JSON.stringify(tempReplication));
 
-    const subscription = await this.subscriptionService.findById({ id: +subscriptionId });
+    const tokens = await this.redisService.getTokens(query.chatId, 'tokens');
 
-    if (!subscription) throw new BotError('Subscription not found', 'Подписка не найдена', 404);
-
-    await this.subscriptionService.updateSubscription({
-      chatId: query.chatId,
-      subscription,
-      action: action,
-      limit: +limit,
+    const keyboard = tokens?.map(token => {
+      return [{ text: `${token.name}(${token.symbol})`, callback_data: `repltoken-${token.id}` }];
     });
 
-    return { text: `Параметры повтора сделок установлены ✅`, options: { parse_mode: 'html' } };
+    return {
+      text: 'Выберите токен для установки параметров:',
+      options: { reply_markup: { inline_keyboard: keyboard } },
+    };
   };
 }

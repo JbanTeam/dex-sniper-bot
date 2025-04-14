@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { IsEthereumAddress, IsEnum, IsString, IsNumber } from 'class-validator';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
+import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'class-validator';
 
 import { User } from './user.entity';
 import { Network } from '@src/types/types';
+import { Replication } from '@modules/subscription/replication.entity';
 
 @Entity()
 export class UserToken {
@@ -31,4 +32,8 @@ export class UserToken {
 
   @ManyToOne(() => User, user => user.tokens, { onDelete: 'CASCADE' })
   user: User;
+
+  @OneToMany(() => Replication, repl => repl.token, { cascade: true })
+  @ValidateNested({ each: true })
+  replications: Replication[];
 }

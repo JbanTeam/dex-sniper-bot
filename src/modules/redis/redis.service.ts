@@ -2,7 +2,16 @@ import Redis from 'ioredis';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { Network, SessionData, SessionSubscription, SessionUserToken, SessionWallet, Address } from '@src/types/types';
+import {
+  Network,
+  SessionData,
+  SessionSubscription,
+  SessionUserToken,
+  SessionWallet,
+  Address,
+  TempReplication,
+  SessionReplication,
+} from '@src/types/types';
 import {
   SubscriptionParams,
   AddTokenParams,
@@ -192,7 +201,10 @@ export class RedisService {
   }
 
   async getTempReplication(chatId: number) {
-    return await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
+    const tempReplicationData = await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
+    if (!tempReplicationData)
+      throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', 404);
+    return this.parseData<TempReplication>(JSON.parse(tempReplicationData));
   }
 
   async getTempSendTokens(chatId: number) {
@@ -200,21 +212,27 @@ export class RedisService {
   }
 
   async getWallets(chatId: number): Promise<SessionWallet[] | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'wallets');
-    if (!userData) return null;
-    return JSON.parse(userData) as SessionWallet[];
+    const data = await this.redisClient.hget(`user:${chatId}`, 'wallets');
+    if (!data) return null;
+    return JSON.parse(data) as SessionWallet[];
   }
 
   async getTokens(chatId: number, prefix: string): Promise<SessionUserToken[] | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, prefix);
-    if (!userData) return null;
-    return JSON.parse(userData) as SessionUserToken[];
+    const data = await this.redisClient.hget(`user:${chatId}`, prefix);
+    if (!data) return null;
+    return JSON.parse(data) as SessionUserToken[];
   }
 
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'subscriptions');
-    if (!userData) return null;
-    return JSON.parse(userData) as SessionSubscription[];
+    const data = await this.redisClient.hget(`user:${chatId}`, 'subscriptions');
+    if (!data) return null;
+    return JSON.parse(data) as SessionSubscription[];
+  }
+
+  async getReplications(chatId: number): Promise<SessionReplication[] | null> {
+    const data = await this.redisClient.hget(`user:${chatId}`, 'replications');
+    if (!data) return null;
+    return JSON.parse(data) as SessionReplication[];
   }
 
   async getAllUsers() {

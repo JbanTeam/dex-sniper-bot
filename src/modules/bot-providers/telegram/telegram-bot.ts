@@ -11,6 +11,7 @@ import { TgMessageHandler } from './handlers/TgMessageHandler';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { BotProviderInterface, IncomingMessage, IncomingQuery } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
+import { Replication } from '@modules/subscription/replication.entity';
 
 @Injectable()
 export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDeleteMsgParams> {
@@ -106,6 +107,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         wallets: [...user.wallets],
         tokens: [...user.tokens],
         subscriptions: [...user.subscriptions],
+        replications: this.mapReplications(user.replications, chatId),
       });
       await this.sendMessage({ chatId: user.chatId, text: message });
     } catch (error) {
@@ -193,11 +195,30 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         wallets: [...user.wallets],
         tokens: [...user.tokens],
         subscriptions: [...user.subscriptions],
+        replications: this.mapReplications(user.replications, chatId),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error setting session: ${message}`);
     }
+  }
+
+  private mapReplications(replications: Replication[], chatId: number) {
+    return replications.map(replication => {
+      return {
+        id: replication.id,
+        network: replication.network,
+        buy: replication.buy,
+        sell: replication.sell,
+        tokenId: replication.token.id,
+        tokenSymbol: replication.token.symbol,
+        tokenAddress: replication.token.address,
+        subscriptionId: replication.subscription.id,
+        subscriptionAddress: replication.subscription.address,
+        chatId,
+        userId: replication.user.id,
+      };
+    });
   }
 
   private checkUpdate(update: TgMessage | TgCallbackQuery): { chatId: number } {

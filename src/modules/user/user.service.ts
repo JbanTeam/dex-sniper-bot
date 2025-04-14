@@ -139,7 +139,7 @@ export class UserService {
     const manager = entityManager || this.userRepository.manager;
     const user = await manager.findOne(User, {
       where: { ...where },
-      relations: ['wallets', 'tokens', 'subscriptions'],
+      relations: ['wallets', 'tokens', 'subscriptions', 'replications'],
       select: {
         id: true,
         createdAt: true,
@@ -161,6 +161,14 @@ export class UserService {
           id: true,
           network: true,
           address: true,
+        },
+        replications: {
+          id: true,
+          network: true,
+          buy: true,
+          sell: true,
+          token: { id: true },
+          subscription: { id: true },
         },
       },
     });

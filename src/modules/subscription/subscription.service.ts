@@ -5,20 +5,29 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 import { Subscription } from './subscription.entity';
-import { UpdateSubscriptionParams } from './types';
+import { Replication } from './replication.entity';
 import { BlockchainService } from '../blockchain/blockchain.service';
 import { User } from '@modules/user/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { Transaction } from '@modules/blockchain/types';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BotError } from '@src/errors/BotError';
-import { Address, Network, SessionSubscription } from '@src/types/types';
+import {
+  Address,
+  Network,
+  SessionData,
+  SessionReplication,
+  SessionSubscription,
+  TempReplication,
+} from '@src/types/types';
 
 @Injectable()
 export class SubscriptionService {
   constructor(
     @InjectRepository(Subscription)
     private readonly subscriptionRepository: Repository<Subscription>,
+    @InjectRepository(Replication)
+    private readonly replicationRepository: Repository<Replication>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly blockchainService: BlockchainService,
@@ -162,32 +171,110 @@ export class SubscriptionService {
   //   }
   // }
 
-  async updateSubscription({ chatId, subscription, action, limit }: UpdateSubscriptionParams) {
-    const updatedSubscription = await this.subscriptionRepository.update(subscription.id, { [action]: limit });
-    if (!updatedSubscription.affected) {
-      throw new BotError('Error updating subscription', 'Ошибка при обновлении подписки', 400);
+  async createOrUpdateReplication(tempReplication: TempReplication) {
+    const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
+    if (!chatId || !subscriptionId || !tokenId) {
+      throw new BotError('Invalid data', 'Некорректные данные', 400);
+    }
+    const userSession = await this.redisService.getUser(chatId);
+
+    const existingReplication = userSession.replications.find(
+      repl => repl.tokenId === tokenId && repl.subscriptionId === subscriptionId,
+    );
+
+    if (existingReplication) {
+      existingReplication[action] = limit;
+      return await this.updateReplication(existingReplication, userSession);
     }
 
-    subscription[action] = limit;
-    const sessionSubscription = { ...subscription, user: undefined };
-    delete sessionSubscription.user;
-    const subscriptions = await this.redisService.getSubscriptions(chatId);
-
-    if (!subscriptions?.length) {
-      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
-    }
-
-    await this.redisService.updateSubscription({
-      chatId,
-      subscription: sessionSubscription,
-      subscriptions,
-    });
+    return await this.createReplication(tempReplication, userSession);
   }
 
-  async findById({ id }: { id: number }) {
+  async findById(id: number) {
     return await this.subscriptionRepository.findOne({
       where: { id },
     });
+  }
+
+  private async createReplication(tempReplication: TempReplication, userSession: SessionData) {
+    const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
+    if (!chatId || !userId || !subscriptionId || !tokenId) {
+      throw new BotError('Invalid data', 'Некорректные данные', 400);
+    }
+
+    const replicationData = {
+      [action]: limit,
+      network,
+      token: { id: tokenId },
+      subscription: { id: subscriptionId },
+      user: { id: userId },
+    };
+
+    const replication = this.replicationRepository.create(replicationData);
+    await this.replicationRepository.save(replication);
+    const fullReplication = await this.replicationRepository.findOne({
+      where: { id: replication.id },
+      relations: ['token', 'subscription', 'user'],
+    });
+
+    if (!fullReplication) {
+      throw new BotError('Replication not found', 'Репликация не найдена', 404);
+    }
+
+    const sessionReplication = {
+      ...fullReplication,
+      tokenAddress: fullReplication.token.address,
+      tokenSymbol: fullReplication.token.symbol,
+      subscriptionAddress: fullReplication.subscription.address,
+      network: fullReplication.subscription.network,
+      tokenId,
+      subscriptionId,
+      chatId,
+      userId,
+      user: undefined,
+      token: undefined,
+      subscription: undefined,
+    };
+    delete sessionReplication.token;
+    delete sessionReplication.subscription;
+    delete sessionReplication.user;
+
+    userSession.replications.push(sessionReplication);
+    await this.redisService.setUserField(chatId, 'replications', JSON.stringify(userSession.replications));
+
+    let reply = '';
+    const token = userSession.tokens.find(t => t.id === tokenId);
+    const subscription = userSession.subscriptions.find(s => s.id === subscriptionId);
+
+    reply += `<u>Кошелек:</u> <b>${subscription?.network}</b> <code>${subscription?.address}</code>\n`;
+    reply += `<u>Токен:</u> <b>${token?.name} (${token?.symbol})</b>\n`;
+    reply += `<u>Лимит на покупку:</u> <b>${sessionReplication.buy}</b>\n`;
+    reply += `<u>Лимит на продажу:</u> <b>${sessionReplication.sell}</b>\n`;
+
+    return reply;
+  }
+
+  private async updateReplication(existingReplication: SessionReplication, userSession: SessionData) {
+    const { buy, sell, chatId } = existingReplication;
+    const updatedReplication = await this.replicationRepository.update(existingReplication.id, { buy, sell });
+    if (!updatedReplication.affected) {
+      throw new BotError('Error updating replication', 'Не удалось установить повтор сделок', 400);
+    }
+
+    userSession.replications = userSession.replications.filter(r => r.id !== existingReplication.id);
+    userSession.replications.push(existingReplication);
+    await this.redisService.setUserField(chatId, 'replications', JSON.stringify(userSession.replications));
+
+    let reply = '';
+    const token = userSession.tokens.find(t => t.id === existingReplication.tokenId);
+    const subscription = userSession.subscriptions.find(s => s.id === existingReplication.subscriptionId);
+
+    reply += `<u>Кошелек:</u> <b>${subscription?.network}</b> <code>${subscription?.address}</code>\n`;
+    reply += `<u>Токен:</u> <b>${token?.name} (${token?.symbol})</b>\n`;
+    reply += `<u>Лимит на покупку:</u> <b>${existingReplication.buy}</b>\n`;
+    reply += `<u>Лимит на продажу:</u> <b>${existingReplication.sell}</b>\n`;
+
+    return reply;
   }
 
   private async checkNewAddedSubscription({

@@ -7,9 +7,10 @@ import { SubscriptionService } from './subscription.service';
 import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { Subscription } from './subscription.entity';
 import { User } from '@modules/user/user.entity';
+import { Replication } from './replication.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Subscription]), UserModule, RedisModule, BlockchainModule],
+  imports: [TypeOrmModule.forFeature([User, Subscription, Replication]), UserModule, RedisModule, BlockchainModule],
   providers: [SubscriptionService],
   exports: [SubscriptionService],
 })
