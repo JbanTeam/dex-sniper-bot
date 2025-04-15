@@ -66,12 +66,12 @@ export class SubscriptionService {
   }
 
   async unsubscribeFromWallet({ chatId, walletAddress }: { chatId: number; walletAddress: Address }) {
-    const subscriptions = await this.redisService.getSubscriptions(chatId);
+    const userSession = await this.redisService.getUser(chatId);
 
-    if (!subscriptions?.length)
+    if (!userSession.subscriptions?.length)
       throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
 
-    const sessionSubscription = subscriptions.find(sub => sub.address === walletAddress);
+    const sessionSubscription = userSession.subscriptions.find(sub => sub.address === walletAddress);
     if (!sessionSubscription)
       throw new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400);
 
@@ -86,8 +86,9 @@ export class SubscriptionService {
 
     await this.redisService.removeSubscription({
       chatId,
-      subscriptions,
-      subscription,
+      subscriptions: userSession.subscriptions,
+      replications: userSession.replications,
+      subscription: sessionSubscription,
     });
 
     this.eventEmitter.emit('monitorTokens', { network: sessionSubscription.network });
@@ -119,6 +120,39 @@ export class SubscriptionService {
         reply += `${index + 1}. <code>${sub.address}</code>\n`;
       });
       reply += '\n';
+    });
+
+    return reply;
+  }
+
+  async getReplications(chatId: number) {
+    const replicatons = await this.redisService.getReplications(chatId);
+
+    if (!replicatons?.length) {
+      throw new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', 404);
+    }
+
+    const groupedReplications = replicatons.reduce(
+      (acc, rep) => {
+        const exchange = this.constants.chains[rep.network].exchange;
+        if (!acc[exchange]) {
+          acc[exchange] = [];
+        }
+        acc[exchange].push(rep);
+        return acc;
+      },
+      {} as Record<string, SessionReplication[]>,
+    );
+
+    let reply = '';
+    Object.entries(groupedReplications).forEach(([exchange, reps]) => {
+      reply += `<u><b>${exchange}:</b></u>\n`;
+      reps.forEach((rep, index) => {
+        reply += `<b>${index + 1}. Кошелек:</b> <code>${rep.subscriptionAddress}</code>\n`;
+        reply += `<b>${rep.tokenSymbol}:</b> <code>${rep.tokenAddress}</code>\n`;
+        reply += `<b>Лимиты:</b> покупка - ${rep.buy}; продажа - ${rep.sell}\n`;
+      });
+      reply += '\n\n';
     });
 
     return reply;

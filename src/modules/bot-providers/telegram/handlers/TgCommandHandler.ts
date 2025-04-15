@@ -44,10 +44,12 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         return this.subscribe(message);
       case command.startsWith('/unfollow'):
         return this.unsubscribe(message);
-      case command.startsWith('/replicate'):
-        return this.replicate(message);
       case command.startsWith('/subscriptions'):
         return this.getSubscriptions(message);
+      case command.startsWith('/replicate'):
+        return this.replicate(message);
+      case command.startsWith('/replications'):
+        return this.getReplications(message);
       case command.startsWith('/send'):
         return this.sendTokens(message);
       case command.startsWith('/faketransaction'):
@@ -232,6 +234,16 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         'Error while setting replication params',
         'Ошибка при установке параметров повтора сделок',
       );
+    }
+  };
+
+  getReplications: TgCommandFunction = async message => {
+    try {
+      const reply = await this.subscriptionService.getReplications(message.chatId);
+
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while getting replications', 'Ошибка при получении повторов сделок');
     }
   };
 

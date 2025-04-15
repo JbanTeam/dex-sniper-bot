@@ -187,7 +187,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     const tokens = await this.redisService.getTokens(query.chatId, 'tokens');
 
     const keyboard = tokens?.map(token => {
-      return [{ text: `${token.name}(${token.symbol})`, callback_data: `repltoken-${token.id}` }];
+      return [{ text: `${token.name} (${token.symbol})`, callback_data: `repltoken-${token.id}` }];
     });
 
     return {

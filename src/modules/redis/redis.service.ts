@@ -74,7 +74,7 @@ export class RedisService {
   async removeToken({ userSession, deleteConditions }: RemoveTokenParams) {
     const { chatId } = userSession;
 
-    const { remainingTokens, deletedTokens, deletedTestTokens } = this.filterTokens({
+    const { remainingTokens, replications, deletedTokens, deletedTestTokens } = this.filterTokens({
       userSession,
       deleteConditions,
     });
@@ -82,6 +82,7 @@ export class RedisService {
     const pipe = this.redisClient.pipeline();
 
     this.deleteTokens({ pipe, chatId, tokens: remainingTokens.tokens, deletedTokens, prefix: 'token' });
+    pipe.hset(`user:${chatId}`, 'replications', JSON.stringify(replications));
 
     if (this.notProd) {
       this.deleteTokens({
@@ -109,10 +110,15 @@ export class RedisService {
     await pipe.exec();
   }
 
-  async removeSubscription({ chatId, subscriptions, subscription }: SubscriptionParams) {
+  async removeSubscription({ chatId, subscriptions, subscription, replications }: SubscriptionParams) {
     const curSubscriptions = subscriptions.filter(sub => sub.id !== subscription.id);
 
     const pipe = this.redisClient.pipeline();
+
+    if (replications?.length) {
+      const curReplications = replications.filter(rep => rep.subscriptionId !== subscription.id);
+      pipe.hset(`user:${chatId}`, `replications`, JSON.stringify(curReplications));
+    }
 
     pipe.hset(`user:${chatId}`, `subscriptions`, JSON.stringify(curSubscriptions));
 
@@ -125,17 +131,6 @@ export class RedisService {
       pipe.srem(`subscriptions:${subscription.network}`, subscription.address);
     }
 
-    await pipe.exec();
-  }
-
-  async updateSubscription({ chatId, subscription, subscriptions }: SubscriptionParams) {
-    const pipe = this.redisClient.pipeline();
-
-    const curSubscriptions = subscriptions.filter(sub => sub.id !== subscription.id);
-    curSubscriptions.push(subscription);
-
-    pipe.hset(`user:${chatId}`, 'subscriptions', JSON.stringify(curSubscriptions));
-    pipe.hmset(`sub:${subscription.address}:${chatId}`, subscription);
     await pipe.exec();
   }
 
@@ -294,11 +289,11 @@ export class RedisService {
       return !shouldDelete;
     });
 
+    const tokenIds = new Set(tokens.map(t => t.id));
     let testTokens = userSession.testTokens;
     if (this.notProd && testTokens) {
-      const idSet = new Set(tokens.map(t => t.id));
       testTokens = testTokens.filter(token => {
-        if (!idSet.has(token.id)) {
+        if (!tokenIds.has(token.id)) {
           deletedTestTokens.push(token);
           return false;
         }
@@ -306,8 +301,13 @@ export class RedisService {
       });
     }
 
+    const replications = userSession.replications.filter(rep => {
+      return tokenIds.has(rep.tokenId);
+    });
+
     return {
       remainingTokens: { tokens, testTokens },
+      replications,
       deletedTokens,
       deletedTestTokens,
     };

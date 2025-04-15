@@ -1,6 +1,6 @@
 import { ChainableCommander } from 'ioredis';
 import { DeleteConditions } from '@modules/user/types';
-import { SessionData, SessionSubscription, SessionUserToken } from '@src/types/types';
+import { SessionData, SessionReplication, SessionSubscription, SessionUserToken } from '@src/types/types';
 
 type AddTokenParams = {
   chatId: number;
@@ -18,6 +18,7 @@ type SubscriptionParams = {
   chatId: number;
   subscription: SessionSubscription;
   subscriptions: SessionSubscription[];
+  replications?: SessionReplication[];
 };
 
 type DeleteTokensParams = {
