@@ -1,10 +1,9 @@
 import Redis from 'ioredis';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import {
   Network,
-  SessionData,
+  SessionUser,
   SessionSubscription,
   SessionUserToken,
   SessionWallet,
@@ -21,6 +20,8 @@ import {
   CleanTokenSetsParams,
 } from './types';
 import { BotError } from '@src/errors/BotError';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { CachedContractsType } from '@modules/blockchain/viem/types';
 
 @Injectable()
 export class RedisService {
@@ -28,20 +29,20 @@ export class RedisService {
   private readonly nodeEnv: string;
   private readonly notProd: boolean;
 
-  constructor(private readonly configService: ConfigService) {
-    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+  constructor(private readonly constants: ConstantsProvider) {
+    this.nodeEnv = this.constants.NODE_ENV;
     this.notProd = this.nodeEnv !== 'production';
 
     this.redisClient = new Redis({
-      host: this.configService.get<string>('REDIS_HOST', 'localhost'),
-      port: this.configService.get<number>('REDIS_PORT', 6379),
-      password: this.configService.get<string>('REDIS_PASSWORD', 'password'),
-      username: this.configService.get<string>('REDIS_USERNAME', 'default'),
-      db: this.configService.get<number>('REDIS_DB', 0),
+      host: this.constants.REDIS_HOST,
+      port: parseInt(this.constants.REDIS_PORT),
+      password: this.constants.REDIS_PASSWORD,
+      username: this.constants.REDIS_USERNAME,
+      db: parseInt(this.constants.REDIS_DB),
     });
   }
 
-  async addUser(userData: SessionData) {
+  async addUser(userData: SessionUser) {
     const { chatId } = userData;
     const userDataArr = Object.entries(userData);
 
@@ -167,11 +168,15 @@ export class RedisService {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
     if (!userData) throw new BotError('User not found', 'Пользователь не найден', 404);
 
-    return this.parseData<SessionData>(userData);
+    return this.parseData<SessionUser>(userData);
   }
 
   async getHashFeilds(key: string) {
     return await this.redisClient.hgetall(key);
+  }
+
+  async setHashFeilds(key: string, fields: object) {
+    return await this.redisClient.hmset(key, fields);
   }
 
   async getUserId(chatId: number) {
@@ -218,6 +223,12 @@ export class RedisService {
     return JSON.parse(data) as SessionUserToken[];
   }
 
+  async getToken(tokenAddress: Address, prefix: string): Promise<SessionUserToken | null> {
+    const data = await this.redisClient.hgetall(`${prefix}:${tokenAddress}`);
+    if (!data) return null;
+    return this.parseData<SessionUserToken>(data);
+  }
+
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {
     const data = await this.redisClient.hget(`user:${chatId}`, 'subscriptions');
     if (!data) return null;
@@ -230,10 +241,16 @@ export class RedisService {
     return JSON.parse(data) as SessionReplication[];
   }
 
+  async getCachedContracts(): Promise<CachedContractsType> {
+    const data = await this.redisClient.hgetall('cachedContracts');
+    if (!data) return {} as CachedContractsType;
+    return this.parseData<CachedContractsType>(data);
+  }
+
   async getAllUsers() {
     const usersIds = await this.redisClient.smembers('users');
 
-    const users: SessionData[] = await Promise.all(
+    const users: SessionUser[] = await Promise.all(
       usersIds.map(async userId => {
         const userData = await this.getUser(Number(userId));
         return userData;

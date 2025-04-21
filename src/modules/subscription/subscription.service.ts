@@ -15,7 +15,7 @@ import { BotError } from '@src/errors/BotError';
 import {
   Address,
   Network,
-  SessionData,
+  SessionUser,
   SessionReplication,
   SessionSubscription,
   TempReplication,
@@ -58,7 +58,7 @@ export class SubscriptionService {
 
     userSession.subscriptions.push(sessionSubscription);
 
-    await this.checkNewAddedSubscription({
+    await this.redisService.addSubscription({
       chatId,
       subscription: sessionSubscription,
       subscriptions: userSession.subscriptions,
@@ -90,8 +90,6 @@ export class SubscriptionService {
       replications: userSession.replications,
       subscription: sessionSubscription,
     });
-
-    this.eventEmitter.emit('monitorTokens', { network: sessionSubscription.network });
   }
 
   async getSubscriptions(chatId: number) {
@@ -159,50 +157,41 @@ export class SubscriptionService {
   }
 
   @OnEvent('handleTransaction')
-  async handleTransaction({ tx }: { tx: Transaction | null }) {
-    if (!tx) return;
+  async handleTransaction({ tx }: { tx: Transaction }) {
+    console.log('Network', tx.network);
+    console.log('Transaction LOG', tx);
 
-    console.log('transaction', tx);
+    const subscriptions = await this.findSubscriptionsByAddress(tx.sender);
 
-    // const subscriptions = await this.findSubscriptionsByAddress(tx.to);
+    if (!subscriptions?.length) return;
 
     // for (const subscription of subscriptions) {
-    //   const user = await this.userRepository.findOne({
-    //     where: { id: subscription.user.id },
-    //     relations: ['wallets'],
-    //   });
-
-    //   if (!user) continue;
-
-    //   const wallet = user.wallets.find(w => w.network === network);
-    //   if (!wallet) continue;
-
-    // await this.replicateTransaction(user, wallet, tx);
+    //   await this.replicateTransaction({ subscription, tx });
     // }
   }
 
-  // private async replicateTransaction(user: User, wallet: Wallet, tx: Transaction) {
-  //   try {
-  //     //Получаем данные о транзакции
-  //     const txData = await this.blockchainService.getTransactionData(tx.hash, wallet.network);
-  //     //Проверяем, достаточно ли средств на кошельке
-  //     const balance = await this.blockchainService.getBalance(wallet.address, wallet.network);
-  //     if (balance < tx.value) {
-  //       throw new Error('Insufficient funds');
-  //     }
-  //     //Повторяем транзакцию
-  //     const replicatedTxHash = await this.blockchainService.sendTransaction({
-  //       from: wallet.address,
-  //       to: txData.to,
-  //       value: txData.value,
-  //       data: txData.data,
-  //       network: wallet.network,
-  //     });
-  //     //Уведомляем пользователя об успешной транзакции
-  //     await this.notifyUser(user.chatId, `Transaction replicated: ${replicatedTxHash}`);
-  //   } catch (error) {
-  //     console.log(error);
+  // private async replicateTransaction({ subscription, tx }: { subscription: Subscription; tx: Transaction }) {
+  // try {
+  //   //Получаем данные о транзакции
+  //   const txData = await this.blockchainService.getTransactionData(tx.hash, wallet.network);
+  //   //Проверяем, достаточно ли средств на кошельке
+  //   const balance = await this.blockchainService.getBalance(wallet.address, wallet.network);
+  //   if (balance < tx.value) {
+  //     throw new Error('Insufficient funds');
   //   }
+  //   //Повторяем транзакцию
+  //   const replicatedTxHash = await this.blockchainService.sendTransaction({
+  //     from: wallet.address,
+  //     to: txData.to,
+  //     value: txData.value,
+  //     data: txData.data,
+  //     network: wallet.network,
+  //   });
+  //   //Уведомляем пользователя об успешной транзакции
+  //   await this.notifyUser(user.chatId, `Transaction replicated: ${replicatedTxHash}`);
+  // } catch (error) {
+  //   console.log(error);
+  // }
   // }
 
   async createOrUpdateReplication(tempReplication: TempReplication) {
@@ -230,7 +219,7 @@ export class SubscriptionService {
     });
   }
 
-  private async createReplication(tempReplication: TempReplication, userSession: SessionData) {
+  private async createReplication(tempReplication: TempReplication, userSession: SessionUser) {
     const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
       throw new BotError('Invalid data', 'Некорректные данные', 400);
@@ -288,7 +277,7 @@ export class SubscriptionService {
     return reply;
   }
 
-  private async updateReplication(existingReplication: SessionReplication, userSession: SessionData) {
+  private async updateReplication(existingReplication: SessionReplication, userSession: SessionUser) {
     const { buy, sell, chatId } = existingReplication;
     const updatedReplication = await this.replicationRepository.update(existingReplication.id, { buy, sell });
     if (!updatedReplication.affected) {
@@ -311,26 +300,6 @@ export class SubscriptionService {
     return reply;
   }
 
-  private async checkNewAddedSubscription({
-    chatId,
-    subscription,
-    subscriptions,
-  }: {
-    chatId: number;
-    subscription: SessionSubscription;
-    subscriptions: SessionSubscription[];
-  }): Promise<void> {
-    await this.redisService.addSubscription({
-      chatId,
-      subscription,
-      subscriptions,
-    });
-
-    if (!this.constants.isChainMonitoring[subscription.network]) {
-      this.eventEmitter.emit('monitorTokens', { network: subscription.network });
-    }
-  }
-
   private async findByUserId({ userId, address, network }: { userId: number; address: Address; network: Network }) {
     return await this.subscriptionRepository.findOne({
       where: {
@@ -345,6 +314,15 @@ export class SubscriptionService {
     return this.subscriptionRepository.find({
       where: { address },
       relations: ['user'],
+      select: {
+        id: true,
+        address: true,
+        network: true,
+        user: {
+          id: true,
+          chatId: true,
+        },
+      },
     });
   }
 }

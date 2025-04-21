@@ -16,6 +16,7 @@ export class ConstantsProvider {
   public readonly DB_PORT: string;
   public readonly DATABASE_URL: string;
   public readonly REDIS_PORT: string;
+  public readonly REDIS_HOST: string;
   public readonly REDIS_DB: string;
   public readonly REDIS_USERNAME: string;
   public readonly REDIS_PASSWORD: string;
@@ -33,7 +34,7 @@ export class ConstantsProvider {
 
   public readonly chains: ChainsType;
   public readonly isChainMonitoring: Record<Network, boolean> = {} as Record<Network, boolean>;
-  public readonly exchangeAddresses: ExchangesType = {} as ExchangesType;
+  public readonly exchangeTestAddresses: ExchangesType = {} as ExchangesType;
   public readonly databaseConfig: TypeOrmModuleOptions;
 
   constructor(private readonly configService: ConfigService) {
@@ -45,6 +46,7 @@ export class ConstantsProvider {
     this.DB_HOST = this.getConfigValue('DB_HOST', 'db');
     this.DB_PORT = this.getConfigValue('DB_PORT', '5432');
     this.DATABASE_URL = this.getConfigValue('DATABASE_URL', '');
+    this.REDIS_HOST = this.getConfigValue('REDIS_HOST', 'localhost');
     this.REDIS_PORT = this.getConfigValue('REDIS_PORT', '6379');
     this.REDIS_DB = this.getConfigValue('REDIS_DB', '0');
     this.REDIS_USERNAME = this.getConfigValue('REDIS_USERNAME', 'default');
@@ -74,7 +76,7 @@ export class ConstantsProvider {
     };
 
     // TODO: поменять ws rpc
-    // TODO: проверить exchangeAddress
+    // TODO: проверить exchangeAddress, routerAddresses, nativeCurrency.address
     this.chains = {
       [Network.BSC]: {
         name: 'Binance Smart Chain',
@@ -88,6 +90,7 @@ export class ConstantsProvider {
           address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
         },
         exchange: 'PancakeSwap',
+        routerAddresses: ['0x10ED43C718714eb63d5aA57B78B54704E256024E'],
         exchangeAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
       },
       [Network.POLYGON]: {
@@ -102,15 +105,16 @@ export class ConstantsProvider {
           address: '0x455e53CBB86018Ac2B8092FdCd39d8444AFFC3F6',
         },
         exchange: 'Uniswap',
+        routerAddresses: ['0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'],
         exchangeAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
       },
     };
 
     Object.keys(Network).forEach(network => {
       this.isChainMonitoring[network as Network] = false;
-      this.exchangeAddresses[network as Network] = {
+      this.exchangeTestAddresses[network as Network] = {
         exchangeAddress: '0x',
-        testAddress: '0x',
+        recipientAddress: '0x',
       };
     });
   }

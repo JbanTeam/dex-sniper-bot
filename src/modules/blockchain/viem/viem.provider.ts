@@ -1,6 +1,6 @@
 import { anvil } from 'viem/chains';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   createWalletClient,
@@ -12,17 +12,19 @@ import {
   webSocket,
   Log,
   parseUnits,
+  parseEventLogs,
 } from 'viem';
 
+import { isSwapLog } from './typeGuards';
 import { BotError } from '@src/errors/BotError';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { RedisService } from '@modules/redis/redis.service';
-import { decodeLogAddress } from '@src/utils/utils';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { Network, ViemNetwork } from '@src/types/types';
+import { abi as routerAbi } from '@src/contract-artifacts/MockRouter.json';
+import { Address, Network, ViemNetwork } from '@src/types/types';
 import { decryptPrivateKey, encryptPrivateKey } from '@src/utils/crypto';
-import { isEtherAddressArr, isNetwork, isNetworkArr } from '@src/types/typeGuards';
-import { anvilAbi, erc20Abi, erc20TransferEvent } from '@src/utils/constants';
+import { isNetwork, isNetworkArr } from '@src/types/typeGuards';
+import { anvilAbi, erc20Abi } from '@src/utils/constants';
 import { SendTransactionParams, ViemClientsType } from './types';
 import {
   BalanceInfo,
@@ -52,7 +54,9 @@ export class ViemProvider implements OnModuleInit {
     this.nodeEnv = this.constants.NODE_ENV;
     this.notProd = this.nodeEnv !== 'production';
 
-    if (this.notProd) this.anvilClients = this.anvilProvider.createClients();
+    if (this.notProd) {
+      this.anvilClients = this.anvilProvider.createClients();
+    }
 
     this.clients = this.createClients();
     this.unwatchCallbacks = {} as { [key in ViemNetwork]: () => void };
@@ -61,12 +65,17 @@ export class ViemProvider implements OnModuleInit {
     });
   }
 
-  onModuleInit() {
+  async onModuleInit() {
+    if (this.notProd) {
+      await this.anvilProvider.initExchangeTestAddresses();
+      await this.anvilProvider.initTestDex();
+    }
+
     const networkKeys = Object.keys(ViemNetwork);
     isNetworkArr(networkKeys);
 
     for (const network of networkKeys) {
-      this.monitorTokens({ network }).catch(error => {
+      this.monitorDex({ network }).catch(error => {
         console.error('Error monitoring tokens:', error);
       });
     }
@@ -184,45 +193,47 @@ export class ViemProvider implements OnModuleInit {
     };
   }
 
-  @OnEvent('monitorTokens')
-  async monitorTokens({ network }: { network: Network }): Promise<void> {
-    console.log(`${network} enter monitorTokens`);
+  async monitorDex({ network }: { network: Network }): Promise<void> {
+    console.log(`${network} enter monitorDex`);
 
-    const canMonitoringChain = await this.canMonitoringChain(network);
-    console.log(`${network} canMonitoringChain`, canMonitoringChain);
-    if (!canMonitoringChain) {
-      this.constants.isChainMonitoring[network] = false;
-      this.unwatchCallbacks[network]();
-      return;
+    let routerAddresses: Address[] = [];
+
+    if (this.notProd) {
+      const cachedContracts = await this.redisService.getCachedContracts();
+      routerAddresses = [cachedContracts.router];
+    } else {
+      routerAddresses = this.constants.chains[network].routerAddresses;
     }
 
-    const tokensAddresses = this.notProd
-      ? await this.redisService.getTokensSet(network, 'testTokens')
-      : await this.redisService.getTokensSet(network, 'tokens');
     const client = this.notProd ? this.anvilClients.publicWebsocket[network] : this.clients.publicWebsocket[network];
 
-    isEtherAddressArr(tokensAddresses);
-
-    console.log(`${network}:tokensAddresses`, tokensAddresses);
-
-    if (this.unwatchCallbacks[network]) this.unwatchCallbacks[network]();
-
     this.unwatchCallbacks[network] = client.watchEvent({
-      address: tokensAddresses,
+      address: routerAddresses,
       onLogs: (logs: Log[]) => {
-        console.log(logs[0].topics);
-        Promise.all(
-          logs.map(async log => {
-            this.eventEmitter.emit('handleTransaction', { tx: this.parseTransactionLog(log, network) });
-          }),
-        ).catch(error => {
-          console.error('Error processing logs:', error);
-          throw error;
-        });
+        (async () => {
+          const parsedLogs = parseEventLogs({
+            abi: routerAbi,
+            eventName: 'Swap',
+            logs,
+          });
+
+          for (const log of parsedLogs) {
+            const tx = this.parseEventLog(log, network);
+            if (!tx) continue;
+
+            const isSubscribed = await this.redisService.existsInSet(`subscriptions:${network}`, tx.sender);
+            if (!isSubscribed) continue;
+
+            const prefix = this.notProd ? 'testTokens' : 'tokens';
+            const tokenInExists = await this.redisService.existsInSet(`${prefix}:${network}`, tx.tokenIn);
+            const tokenOutExists = await this.redisService.existsInSet(`${prefix}:${network}`, tx.tokenOut);
+            if (!tokenInExists && !tokenOutExists) continue;
+
+            this.eventEmitter.emit('handleTransaction', { tx });
+          }
+        })().catch(error => console.error('Error processing logs:', error));
       },
     });
-
-    this.constants.isChainMonitoring[network] = true;
   }
 
   async stopMonitoring() {
@@ -359,27 +370,21 @@ export class ViemProvider implements OnModuleInit {
     return balanceReply;
   }
 
-  private parseTransactionLog(log: Log, network: Network): Transaction | null {
-    try {
-      if (log.topics[0] === erc20TransferEvent) {
-        const decimals = 18;
+  private parseEventLog(log: Log, network: Network): Transaction | null {
+    if (!isSwapLog(log)) return null;
+    const parsedLog: Transaction = {
+      eventName: log.eventName,
+      routerAddress: log.address.toLowerCase() as Address,
+      sender: log.args.sender.toLowerCase() as Address,
+      amountIn: log.args.amountIn,
+      amountOut: log.args.amountOut,
+      tokenIn: log.args.tokenIn.toLowerCase() as Address,
+      tokenOut: log.args.tokenOut.toLowerCase() as Address,
+      network,
+      data: log.data,
+    };
 
-        return {
-          hash: log.transactionHash ? log.transactionHash : `0x`,
-          from: log.topics[1] ? decodeLogAddress(log.topics[1]) : `0x`,
-          to: log.topics[2] ? decodeLogAddress(log.topics[2]) : `0x`,
-          contractAddress: log.address,
-          value: formatUnits(BigInt(log.data), decimals),
-          data: log.data,
-          network,
-        };
-      }
-
-      return null;
-    } catch (error) {
-      console.error('Error parsing transaction log:', error);
-      return null;
-    }
+    return parsedLog;
   }
 
   private async canMonitoringChain(network: Network): Promise<boolean> {

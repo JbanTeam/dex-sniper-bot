@@ -47,6 +47,35 @@ type SendTestTokenParams = {
   decimals: number;
 };
 
+type CachedContractsType = {
+  wbnb: `0x${string}`;
+  factory: `0x${string}`;
+  router: `0x${string}`;
+};
+
+type ErcSwapFnType = 'swapExactETHForTokens' | 'swapExactTokensForETH' | 'swapExactTokensForTokens';
+
+type SwapLog = {
+  eventName: 'Swap';
+  args: {
+    sender: `0x${string}`;
+    amountIn: bigint;
+    amountOut: bigint;
+    tokenIn: `0x${string}`;
+    tokenOut: `0x${string}`;
+  };
+  address: `0x${string}`;
+  topics: `0x${string}`[];
+  data: `0x${string}`;
+  blockHash: `0x${string}`;
+  blockNumber: bigint;
+  blockTimestamp: string;
+  transactionHash: `0x${string}`;
+  transactionIndex: number;
+  logIndex: number;
+  removed: boolean;
+};
+
 export {
   ViemClientsType,
   DeployTestContractParams,
@@ -54,4 +83,7 @@ export {
   TestBalanceParams,
   SendTransactionParams,
   SendTestTokenParams,
+  CachedContractsType,
+  ErcSwapFnType,
+  SwapLog,
 };

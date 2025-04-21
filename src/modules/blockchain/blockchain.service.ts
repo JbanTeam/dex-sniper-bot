@@ -62,7 +62,7 @@ export class BlockchainService {
     });
   }
 
-  async sendFakeTransaction(testToken: SessionUserToken) {
-    return this.anvilProvider.sendFakeTransaction(testToken);
+  async sendFakeSwap(testToken: SessionUserToken) {
+    return this.anvilProvider.sendFakeSwap(testToken);
   }
 }

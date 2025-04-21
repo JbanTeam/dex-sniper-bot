@@ -52,8 +52,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         return this.getReplications(message);
       case command.startsWith('/send'):
         return this.sendTokens(message);
-      case command.startsWith('/faketransaction'):
-        return this.sendFakeTransaction(message);
+      case command.startsWith('/fake'):
+        return this.sendFakeSwap(message);
       case command.startsWith('/help'):
         return { text: helpMessage };
       default:
@@ -62,7 +62,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
   };
 
   addToken: TgCommandFunction = async message => {
-    const [, tokenAddress] = message.text.split(' ');
+    const [, tokenAddr] = message.text.split(' ');
+    const tokenAddress = tokenAddr.toLowerCase().trim();
 
     try {
       const userExists = await this.redisService.existsInSet('users', message.chatId.toString());
@@ -139,7 +140,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   subscribe: TgCommandFunction = async message => {
     try {
-      const [, walletAddress] = message.text.split(' ');
+      const [, walletAddr] = message.text.split(' ');
+      const walletAddress = walletAddr.toLowerCase().trim();
 
       isEtherAddress(walletAddress, 'Введите корректный адрес кошелька. Пример: /follow [адрес_кошелька]');
 
@@ -301,7 +303,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
     return { text: userMsg, options: { parse_mode: 'html' } };
   }
 
-  private sendFakeTransaction: TgCommandFunction = async message => {
+  private sendFakeSwap: TgCommandFunction = async message => {
     if (this.constants.NODE_ENV === 'production') {
       return { text: 'Неизвестная команда, попробуйте /help' };
     }
@@ -315,7 +317,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const testToken = testTokens[0];
 
       if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
-      await this.blockchainService.sendFakeTransaction(testToken);
+      await this.blockchainService.sendFakeSwap(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
     } catch (error) {

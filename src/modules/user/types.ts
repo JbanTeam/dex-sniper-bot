@@ -1,7 +1,7 @@
-import { Address, Network, SessionData, SessionUserToken } from '@src/types/types';
+import { Address, Network, SessionUser, SessionUserToken } from '@src/types/types';
 
 export type AddTokenParams = {
-  userSession: SessionData;
+  userSession: SessionUser;
   address: Address;
   network: Network;
 };
@@ -13,7 +13,7 @@ export type RemoveTokenParams = {
 };
 
 export type CreateTokenEntityParams = {
-  userSession: SessionData;
+  userSession: SessionUser;
   address: Address;
   network: Network;
   name: string;
@@ -22,7 +22,7 @@ export type CreateTokenEntityParams = {
 };
 
 export type CreateTestTokenParams = {
-  userSession: SessionData;
+  userSession: SessionUser;
   sessionToken: SessionUserToken;
   existsTokenId?: string;
 };

@@ -1,6 +1,6 @@
 import { ChainableCommander } from 'ioredis';
 import { DeleteConditions } from '@modules/user/types';
-import { SessionData, SessionReplication, SessionSubscription, SessionUserToken } from '@src/types/types';
+import { SessionUser, SessionReplication, SessionSubscription, SessionUserToken } from '@src/types/types';
 
 type AddTokenParams = {
   chatId: number;
@@ -10,7 +10,7 @@ type AddTokenParams = {
 };
 
 type RemoveTokenParams = {
-  userSession: SessionData;
+  userSession: SessionUser;
   deleteConditions: DeleteConditions;
 };
 
@@ -30,7 +30,7 @@ type DeleteTokensParams = {
 };
 
 type FilterTokensParams = {
-  userSession: SessionData;
+  userSession: SessionUser;
   deleteConditions: DeleteConditions;
 };
 

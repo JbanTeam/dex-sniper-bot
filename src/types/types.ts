@@ -60,6 +60,7 @@ export type ViemChainConfig = {
     address: Address;
   };
   exchange: string;
+  routerAddresses: Address[];
   exchangeAddress: Address;
 };
 
@@ -70,7 +71,7 @@ export type ChainsType = {
 export type ExchangesType = {
   [key in Network]: {
     exchangeAddress: Address;
-    testAddress: Address;
+    recipientAddress: Address;
   };
 };
 
@@ -84,7 +85,7 @@ export type TempReplication = {
   tokenId?: number;
 };
 
-export interface SessionData {
+export type SessionUser = {
   userId: number;
   chatId: number;
   wallets: SessionWallet[];
@@ -97,7 +98,7 @@ export interface SessionData {
   tempWallet?: string;
   tempReplication?: TempReplication;
   tempSendTokens?: string;
-}
+};
 
 export type SessionUserToken = Omit<UserToken, 'user' | 'replications'>;
 export type SessionWallet = Omit<Wallet, 'user'>;

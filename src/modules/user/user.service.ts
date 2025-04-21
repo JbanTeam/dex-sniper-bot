@@ -1,12 +1,12 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ConfigService } from '@nestjs/config';
 import { EntityManager, Repository } from 'typeorm';
 
 import { User } from './user.entity';
 import { UserToken } from './user-token.entity';
 import { RegisterDto } from './dto/register.dto';
+import { BotError } from '@src/errors/BotError';
+import { isNetwork } from '@src/types/typeGuards';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { Network, SessionUserToken } from '@src/types/types';
@@ -18,8 +18,7 @@ import {
   RemoveTokenParams,
   UpdateTokenStorageParams,
 } from './types';
-import { BotError } from '@src/errors/BotError';
-import { isNetwork } from '@src/types/typeGuards';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 
 @Injectable()
 export class UserService {
@@ -32,10 +31,9 @@ export class UserService {
     private readonly userTokenRepository: Repository<UserToken>,
     private readonly blockchainService: BlockchainService,
     private readonly redisService: RedisService,
-    private readonly configService: ConfigService,
-    private readonly eventEmitter: EventEmitter2,
+    private readonly constants: ConstantsProvider,
   ) {
-    this.nodeEnv = this.configService.get<string>('NODE_ENV', 'development');
+    this.nodeEnv = this.constants.NODE_ENV;
     this.notProd = this.nodeEnv !== 'production';
   }
 
@@ -131,8 +129,6 @@ export class UserService {
     if (!deleteResult.affected) throw new BotError('Tokens not deleted', 'Токены не удалены', 400);
 
     await this.redisService.removeToken({ userSession, deleteConditions });
-
-    this.eventEmitter.emit('monitorTokens', { network });
   }
 
   async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
@@ -242,13 +238,8 @@ export class UserService {
 
   private async updateTokenStorage({ chatId, tokens, token, isTest = false }: UpdateTokenStorageParams) {
     const prefix = isTest ? 'testToken' : 'token';
-    const exists = await this.redisService.existsInSet(`${prefix}s:${token.network}`, token.address);
 
     await this.redisService.addToken({ chatId, token, tokens, prefix });
-
-    if (!exists && isTest === this.notProd) {
-      this.eventEmitter.emit('monitorTokens', { network: token.network });
-    }
   }
 
   private async createTestToken({ userSession, sessionToken, existsTokenId }: CreateTestTokenParams) {
