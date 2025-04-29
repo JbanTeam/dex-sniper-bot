@@ -31,6 +31,7 @@ import {
   CheckTokenReturnType,
   GetBalanceParams,
   GetTokenBalanceParams,
+  SendNativeParams,
   SendTokensParams,
   TokenBalanceReturnType,
   Transaction,
@@ -268,6 +269,37 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
       }
 
       await this.viemHelper.transfer({ tokenAddress, wallet, recipientAddress, txAmount });
+    } catch (error) {
+      if (error?.details?.includes('Out of gas')) {
+        throw new BotError(
+          `Top up balance ${currency} for transaction`,
+          `Пополните баланс <u>${currency}</u> для совершения транзакции`,
+          400,
+        );
+      }
+      throw error;
+    }
+  }
+
+  async sendNative({ wallet, amount, recipientAddress }: SendNativeParams) {
+    const { network } = wallet;
+    const publicClient = this.clients.public[network];
+    const decimals = this.constants.chains[network].tokenDecimals;
+    const currency = this.constants.chains[network].tokenSymbol;
+
+    const txAmount = parseUnits(amount, decimals);
+
+    try {
+      const nativeBalance = await publicClient.getBalance({ address: wallet.address });
+      if (nativeBalance === 0n || nativeBalance < txAmount) {
+        throw new BotError(
+          `Top up balance ${currency} for transaction`,
+          `Пополните баланс <u>${currency}</u> для совершения транзакции`,
+          400,
+        );
+      }
+
+      await this.viemHelper.transferNative({ wallet, recipientAddress, txAmount });
     } catch (error) {
       if (error?.details?.includes('Out of gas')) {
         throw new BotError(

@@ -43,6 +43,8 @@ type SendTokensParams = {
   recipientAddress: Address;
 };
 
+type SendNativeParams = Omit<SendTokensParams, 'token'>;
+
 type DeployTestContractParams = { wallet: SessionWallet; token: SessionUserToken };
 
 type Transaction = {
@@ -95,6 +97,7 @@ export {
   GetTokenBalanceParams,
   TokenBalanceReturnType,
   SendTokensParams,
+  SendNativeParams,
   DeployTestContractParams,
   Transaction,
   BalanceInfo,

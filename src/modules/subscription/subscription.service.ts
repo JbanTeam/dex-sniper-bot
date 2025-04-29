@@ -222,25 +222,12 @@ export class SubscriptionService {
       const testToken = userSession.testTokens?.find(t => t.id === tokenId);
       tokenAddress = testToken?.address || fullReplication.token.address;
     }
-    // TODO: prepareReplication
-    const sessionReplication = {
-      ...fullReplication,
+
+    const sessionReplication = this.prepareSessionReplicateion({
+      replication: fullReplication,
       tokenAddress,
-      tokenSymbol: fullReplication.token.symbol,
-      tokenDecimals: fullReplication.token.decimals,
-      subscriptionAddress: fullReplication.subscription.address,
-      network: fullReplication.subscription.network,
-      tokenId,
-      subscriptionId,
-      chatId,
-      userId,
-      user: undefined,
-      token: undefined,
-      subscription: undefined,
-    };
-    delete sessionReplication.token;
-    delete sessionReplication.subscription;
-    delete sessionReplication.user;
+      tempReplication,
+    });
 
     userSession.replications.push(sessionReplication);
     await this.redisService.setUserField(chatId, 'replications', JSON.stringify(userSession.replications));
@@ -255,6 +242,41 @@ export class SubscriptionService {
     reply += `<u>Лимит на продажу:</u> <b>${sessionReplication.sell}</b>\n`;
 
     return reply;
+  }
+
+  private prepareSessionReplicateion({
+    replication,
+    tokenAddress,
+    tempReplication,
+  }: {
+    replication: Replication;
+    tokenAddress: Address;
+    tempReplication: TempReplication;
+  }) {
+    const { subscriptionId, tokenId, chatId, userId } = tempReplication;
+    if (!chatId || !userId || !subscriptionId || !tokenId) {
+      throw new BotError('Invalid data', 'Некорректные данные', 400);
+    }
+    const sessionReplication = {
+      ...replication,
+      tokenAddress,
+      tokenSymbol: replication.token.symbol,
+      tokenDecimals: replication.token.decimals,
+      subscriptionAddress: replication.subscription.address,
+      network: replication.subscription.network,
+      tokenId,
+      subscriptionId,
+      chatId,
+      userId,
+      user: undefined,
+      token: undefined,
+      subscription: undefined,
+    };
+    delete sessionReplication.token;
+    delete sessionReplication.subscription;
+    delete sessionReplication.user;
+
+    return sessionReplication;
   }
 
   private async updateReplication(existingReplication: SessionReplication, userSession: SessionUser) {

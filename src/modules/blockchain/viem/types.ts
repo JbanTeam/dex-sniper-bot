@@ -27,8 +27,14 @@ type DeployContractParams = {
   network: Network;
 };
 
-type SendTransactionParams = {
+type TransferParams = {
   tokenAddress: Address;
+  wallet: Wallet;
+  recipientAddress: Address;
+  txAmount: bigint;
+};
+
+type TransferNativeParams = {
   wallet: Wallet;
   recipientAddress: Address;
   txAmount: bigint;
@@ -117,7 +123,8 @@ export {
   DeployTestContractParams,
   DeployContractParams,
   TestBalanceParams,
-  SendTransactionParams,
+  TransferParams,
+  TransferNativeParams,
   BalanceAllowanceParams,
   AllowanceParams,
   BalanceOfParams,

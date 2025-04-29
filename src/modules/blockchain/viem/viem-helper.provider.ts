@@ -35,9 +35,10 @@ import {
   BalanceOfParams,
   CachedContractsType,
   ErcSwapFnType,
-  SendTransactionParams,
+  TransferParams,
   SwapParams,
   ViemClientsType,
+  TransferNativeParams,
 } from './types';
 
 @Injectable()
@@ -208,10 +209,9 @@ export class ViemHelperProvider implements OnModuleInit {
       sender: sender.toLowerCase() as Address,
       to: to.toLowerCase() as Address,
       amountIn,
+      amountOut,
       tokenIn,
       tokenOut,
-      amountOut,
-
       network,
       data: log.data,
     };
@@ -254,7 +254,7 @@ export class ViemHelperProvider implements OnModuleInit {
     }
   }
 
-  async transfer({ tokenAddress, wallet, recipientAddress, txAmount }: SendTransactionParams) {
+  async transfer({ tokenAddress, wallet, recipientAddress, txAmount }: TransferParams) {
     const { network } = wallet;
     const publicClient = this.clients.public[network];
 
@@ -278,6 +278,30 @@ export class ViemHelperProvider implements OnModuleInit {
     }
 
     console.log('✅ Токены отправлены', receipt);
+  }
+
+  async transferNative({ wallet, recipientAddress, txAmount }: TransferNativeParams) {
+    const { network } = wallet;
+    const publicClient = this.clients.public[network];
+    const currency = this.constants.chains[network].tokenSymbol;
+    const account = this.getAccount(wallet);
+    const { chain, rpcUrl } = this.getSharedVars(network);
+    const walletClient = this.getWalletClient(chain, rpcUrl, account);
+
+    const hash = await walletClient.sendTransaction({
+      to: recipientAddress,
+      value: txAmount,
+      chain,
+      account,
+    });
+
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status !== 'success') {
+      throw new BotError(`${currency} not sent ❌`, `🚫 Ошибка отправки ${currency}`, 400);
+    }
+
+    console.log(`✅ ${currency} отправлены`, receipt);
   }
 
   async balanceOf({ tokenAddress, walletAddress, publicClient }: BalanceOfParams) {

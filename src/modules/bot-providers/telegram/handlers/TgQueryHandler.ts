@@ -11,6 +11,7 @@ import { IncomingQuery } from '@src/types/types';
 import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
 import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
@@ -20,6 +21,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
     private readonly walletService: WalletService,
+    private readonly constants: ConstantsProvider,
   ) {
     const logger = new Logger(TgQueryHandler.name);
     super(logger);
@@ -152,7 +154,6 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
 
       isNetwork(network);
-      isEtherAddress(tokenAddress);
       isEtherAddress(recipientAddress);
       if (!strIsPositiveNumber(amount)) {
         throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
@@ -161,23 +162,40 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const userSession = await this.redisService.getUser(query.chatId);
       const wallet = userSession.wallets.find(wallet => wallet.network === network);
       if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
-      const token = userSession.tokens.find(token => token.address === tokenAddress);
-      if (!token) {
-        throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
-      }
 
       const fullWallet = await this.walletService.findByAddress(wallet.address);
       if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
 
-      await this.blockchainService.sendTokens({
-        userSession,
-        wallet: fullWallet,
-        token,
-        amount,
-        recipientAddress,
-      });
+      let reply: string;
+      if (tokenAddress === 'native') {
+        const currency = this.constants.chains[network].tokenSymbol;
+        await this.blockchainService.sendNative({
+          userSession,
+          wallet: fullWallet,
+          amount,
+          recipientAddress,
+        });
 
-      return { text: `Токены успешно отправлены ✅`, options: { parse_mode: 'html' } };
+        reply = `${currency} успешно отправлены ✅`;
+      } else {
+        isEtherAddress(tokenAddress);
+        const token = userSession.tokens.find(token => token.address === tokenAddress);
+        if (!token) {
+          throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
+        }
+
+        await this.blockchainService.sendTokens({
+          userSession,
+          wallet: fullWallet,
+          token,
+          amount,
+          recipientAddress,
+        });
+
+        reply = `${token.symbol} успешно отправлены ✅`;
+      }
+
+      return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
       return this.handleError(error, 'Error while sending tokens', 'Ошибка при отправке токенов');
     }

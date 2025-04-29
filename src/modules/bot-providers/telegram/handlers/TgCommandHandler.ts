@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
+import { IncomingMessage } from '@src/types/types';
 import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { strIsPositiveNumber } from '@src/utils/utils';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { IncomingMessage } from '@src/types/types';
 import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
 import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
@@ -268,19 +268,32 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   sendTokens: TgCommandFunction = async message => {
     try {
-      const [, tokenAddress, amount, recipientAddress] = message.text.split(' ');
+      const parts = message.text.split(' ');
+      if (parts.length !== 3 && parts.length !== 4) {
+        throw new BotError('Invalid format', 'Неверный формат команды', 400);
+      }
 
-      // TODO: send native currency?
-      isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
+      let tokenAddress: string | null = null;
+      let amount: string;
+      let recipientAddress: string;
+
+      if (parts.length === 4) {
+        [, tokenAddress, amount, recipientAddress] = parts;
+        isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
+      } else {
+        [, amount, recipientAddress] = parts;
+      }
+
       isEtherAddress(recipientAddress, 'Введите корректный адрес получателя');
+
       if (!strIsPositiveNumber(amount)) {
-        throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
+        throw new BotError('Enter correct amount', 'Введите корректную сумму', 400);
       }
 
       await this.redisService.setUserField(
         message.chatId,
         'tempSendTokens',
-        `${tokenAddress}:${amount}:${recipientAddress}`,
+        `${tokenAddress || 'native'}:${amount}:${recipientAddress}`,
       );
 
       const networks = Object.entries(this.constants.chains);

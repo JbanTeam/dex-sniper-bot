@@ -11,6 +11,7 @@ import {
   CreateWalletParams,
   DeployTestContractParams,
   GetBalanceParams,
+  SendNativeParams,
   SendTokensParams,
 } from './types';
 
@@ -53,6 +54,12 @@ export class BlockchainService {
     const { network } = sendTokensParams.wallet;
     const provider = this.networkProviders[network];
     return provider.sendTokens(sendTokensParams);
+  }
+
+  async sendNative(sendNativeParams: SendNativeParams) {
+    const { network } = sendNativeParams.wallet;
+    const provider = this.networkProviders[network];
+    return provider.sendNative(sendNativeParams);
   }
 
   async createTestToken({ wallet, token }: DeployTestContractParams) {
