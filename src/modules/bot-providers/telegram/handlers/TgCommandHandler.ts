@@ -93,7 +93,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   removeToken: TgCommandFunction = async message => {
     try {
-      const [, tokenAddress] = message.text.split(' ');
+      const [, tokenAddr] = message.text.split(' ');
+      const tokenAddress = tokenAddr?.toLowerCase().trim();
       const userSession = await this.redisService.getUser(message.chatId);
 
       if (!userSession.tokens?.length) {
@@ -117,6 +118,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       keyboard?.push([{ text: 'Все токены', callback_data: 'rm-all' }]);
 
       return {
+        // TODO: оформление текста
         text: `Выберите действие:\n1. Удалить <u>все</u> токены\n2. Удалить <u>все</u> токены в выбранной сети`,
         options: {
           parse_mode: 'html',
@@ -166,7 +168,8 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   unsubscribe: TgCommandFunction = async message => {
     try {
-      const [, walletAddress] = message.text.split(' ');
+      const [, walletAddr] = message.text.split(' ');
+      const walletAddress = walletAddr.toLowerCase().trim();
 
       isEtherAddress(walletAddress, 'Введите корректный адрес кошелька. Пример: /follow [адрес_кошелька]');
 
@@ -267,6 +270,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
     try {
       const [, tokenAddress, amount, recipientAddress] = message.text.split(' ');
 
+      // TODO: send native currency?
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
       isEtherAddress(recipientAddress, 'Введите корректный адрес получателя');
       if (!strIsPositiveNumber(amount)) {

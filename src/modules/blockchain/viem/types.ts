@@ -1,7 +1,8 @@
-import { PublicClient } from 'viem';
+import { Account, PublicClient, WalletClient } from 'viem';
 
+import { Transaction } from '../types';
 import { Wallet } from '@modules/wallet/wallet.entity';
-import { Address, SessionUserToken, ViemNetwork } from '@src/types/types';
+import { Address, Network, SessionReplication, SessionUserToken, ViemNetwork } from '@src/types/types';
 
 type ViemClientsType = {
   public: {
@@ -23,34 +24,68 @@ type DeployContractParams = {
   symbol: string;
   decimals: number;
   count: string;
+  network: Network;
 };
 
 type SendTransactionParams = {
   tokenAddress: Address;
   wallet: Wallet;
   recipientAddress: Address;
-  amount: string;
-  decimals: number;
+  txAmount: bigint;
 };
 
 type TestBalanceParams = {
-  contractAddress: Address;
-  testAccount: Address;
+  tokenAddress: Address;
+  walletAddress: Address;
   decimals: number;
   name: string;
 };
 
 type SendTestTokenParams = {
-  contractAddress: Address;
-  testAccount: Address;
+  tokenAddress: Address;
+  sender: Address;
   walletAddress: Address;
   decimals: number;
 };
 
+type BalanceAllowanceParams = {
+  replication: SessionReplication;
+  account: Account;
+  tx: Transaction;
+  walletClient: WalletClient;
+};
+
+type AllowanceParams = {
+  routerAddress: Address;
+  tokenAddress: Address;
+  walletAddress: Address;
+  network: Network;
+};
+
+type BalanceOfParams = {
+  tokenAddress: Address;
+  walletAddress: Address;
+  publicClient: PublicClient;
+};
+
+type ApproveParams = {
+  tokenAddress: Address;
+  walletClient: WalletClient;
+  tx: Transaction;
+  account: Account;
+};
+
+type SwapParams = {
+  walletAddress: Address;
+  tx: Transaction;
+  account: Account;
+  walletClient: WalletClient;
+};
+
 type CachedContractsType = {
-  wbnb: `0x${string}`;
-  factory: `0x${string}`;
-  router: `0x${string}`;
+  nativeToken: Address;
+  factoryAddress: Address;
+  routerAddress: Address;
 };
 
 type ErcSwapFnType = 'swapExactETHForTokens' | 'swapExactTokensForETH' | 'swapExactTokensForTokens';
@@ -58,19 +93,20 @@ type ErcSwapFnType = 'swapExactETHForTokens' | 'swapExactTokensForETH' | 'swapEx
 type SwapLog = {
   eventName: 'Swap';
   args: {
-    sender: `0x${string}`;
-    amountIn: bigint;
-    amountOut: bigint;
-    tokenIn: `0x${string}`;
-    tokenOut: `0x${string}`;
+    sender: Address;
+    to: Address;
+    amount0In: bigint;
+    amount1In: bigint;
+    amount0Out: bigint;
+    amount1Out: bigint;
   };
-  address: `0x${string}`;
-  topics: `0x${string}`[];
-  data: `0x${string}`;
-  blockHash: `0x${string}`;
+  address: Address;
+  topics: Address[];
+  data: Address;
+  blockHash: Address;
   blockNumber: bigint;
   blockTimestamp: string;
-  transactionHash: `0x${string}`;
+  transactionHash: Address;
   transactionIndex: number;
   logIndex: number;
   removed: boolean;
@@ -82,6 +118,11 @@ export {
   DeployContractParams,
   TestBalanceParams,
   SendTransactionParams,
+  BalanceAllowanceParams,
+  AllowanceParams,
+  BalanceOfParams,
+  ApproveParams,
+  SwapParams,
   SendTestTokenParams,
   CachedContractsType,
   ErcSwapFnType,

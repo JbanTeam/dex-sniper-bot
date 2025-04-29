@@ -22,17 +22,13 @@ import {
 import { BotError } from '@src/errors/BotError';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { CachedContractsType } from '@modules/blockchain/viem/types';
+import { isEtherAddress } from '@src/types/typeGuards';
 
 @Injectable()
 export class RedisService {
   private readonly redisClient: Redis;
-  private readonly nodeEnv: string;
-  private readonly notProd: boolean;
 
   constructor(private readonly constants: ConstantsProvider) {
-    this.nodeEnv = this.constants.NODE_ENV;
-    this.notProd = this.nodeEnv !== 'production';
-
     this.redisClient = new Redis({
       host: this.constants.REDIS_HOST,
       port: parseInt(this.constants.REDIS_PORT),
@@ -72,6 +68,27 @@ export class RedisService {
     await pipe.exec();
   }
 
+  async addPair({
+    network,
+    pairAddress,
+    token0,
+    token1,
+    prefix,
+  }: {
+    network: Network;
+    pairAddress: Address;
+    token0: Address;
+    token1: Address;
+    prefix: string;
+  }) {
+    const pipe = this.redisClient.pipeline();
+
+    pipe.hset(`${prefix}:${network}`, pairAddress.toLowerCase(), `${token0.toLowerCase()}:${token1.toLowerCase()}`);
+    pipe.sadd(`${prefix}s:${network}`, pairAddress.toLowerCase());
+
+    await pipe.exec();
+  }
+
   async removeToken({ userSession, deleteConditions }: RemoveTokenParams) {
     const { chatId } = userSession;
 
@@ -85,7 +102,7 @@ export class RedisService {
     this.deleteTokens({ pipe, chatId, tokens: remainingTokens.tokens, deletedTokens, prefix: 'token' });
     pipe.hset(`user:${chatId}`, 'replications', JSON.stringify(replications));
 
-    if (this.notProd) {
+    if (this.constants.notProd) {
       this.deleteTokens({
         pipe,
         chatId,
@@ -97,7 +114,7 @@ export class RedisService {
 
     await pipe.exec();
     await this.cleanTokenSets({ deletedTokens, prefix: 'token' });
-    if (this.notProd) {
+    if (this.constants.notProd) {
       await this.cleanTokenSets({ deletedTokens: deletedTestTokens, prefix: 'testToken' });
     }
   }
@@ -229,6 +246,16 @@ export class RedisService {
     return this.parseData<SessionUserToken>(data);
   }
 
+  async getPair(prefix: string, pairAddress: Address, network: Network) {
+    const pair = await this.redisClient.hget(`${prefix}:${network}`, pairAddress.toLowerCase());
+    if (!pair) return null;
+    const [token0, token1] = pair.split(':');
+    isEtherAddress(token0);
+    isEtherAddress(token1);
+
+    return { token0, token1 };
+  }
+
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {
     const data = await this.redisClient.hget(`user:${chatId}`, 'subscriptions');
     if (!data) return null;
@@ -267,6 +294,11 @@ export class RedisService {
   async getTokensSet(network: Network, prefix: string) {
     const tokens = await this.redisClient.smembers(`${prefix}:${network}`);
     return tokens;
+  }
+
+  async getPairsSet(network: Network, prefix: string) {
+    const pairs = await this.redisClient.smembers(`${prefix}:${network}`);
+    return pairs;
   }
 
   async getSubscriptionsSet(network: Network) {
@@ -308,7 +340,7 @@ export class RedisService {
 
     const tokenIds = new Set(tokens.map(t => t.id));
     let testTokens = userSession.testTokens;
-    if (this.notProd && testTokens) {
+    if (this.constants.notProd && testTokens) {
       testTokens = testTokens.filter(token => {
         if (!tokenIds.has(token.id)) {
           deletedTestTokens.push(token);

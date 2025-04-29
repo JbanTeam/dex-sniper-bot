@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { bsc, polygon } from 'viem/chains';
 
-import { ChainsType, ExchangesType, Network } from '@src/types/types';
+import { Address, ChainsType, Network } from '@src/types/types';
 
 @Injectable()
 export class ConstantsProvider {
@@ -32,9 +32,12 @@ export class ConstantsProvider {
   public readonly BSC_RPC_URL: string;
   public readonly BSC_WS_RPC_URL: string;
 
+  public readonly notProd: boolean;
   public readonly chains: ChainsType;
-  public readonly isChainMonitoring: Record<Network, boolean> = {} as Record<Network, boolean>;
-  public readonly exchangeTestAddresses: ExchangesType = {} as ExchangesType;
+  public readonly anvilAddresses: { exchangeAddress: Address; recipientAddress: Address } = {
+    exchangeAddress: '0x',
+    recipientAddress: '0x',
+  };
   public readonly databaseConfig: TypeOrmModuleOptions;
 
   constructor(private readonly configService: ConfigService) {
@@ -59,9 +62,11 @@ export class ConstantsProvider {
     this.ANVIL_RPC_URL = this.getConfigValue('ANVIL_RPC_URL', 'http://dex_sniper-anvil:8545');
     this.ANVIL_WS_RPC_URL = this.getConfigValue('ANVIL_WS_RPC_URL', 'ws://dex_sniper-anvil:8545');
     this.POLYGON_RPC_URL = this.getConfigValue('POLYGON_RPC_URL', 'https://polygon-rpc.com/');
-    this.POLYGON_WS_RPC_URL = this.getConfigValue('POLYGON_WS_RPC_URL', 'https://polygon-rpc.com/');
+    this.POLYGON_WS_RPC_URL = this.getConfigValue('POLYGON_WS_RPC_URL', 'wss://go.getblock.io/');
     this.BSC_RPC_URL = this.getConfigValue('BSC_RPC_URL', 'https://bsc-dataseed.binance.org/');
-    this.BSC_WS_RPC_URL = this.getConfigValue('BSC_WS_RPC_URL', 'https://bsc-dataseed.binance.org/');
+    this.BSC_WS_RPC_URL = this.getConfigValue('BSC_WS_RPC_URL', 'wss://go.getblock.io/');
+
+    this.notProd = this.NODE_ENV !== 'production';
 
     this.databaseConfig = {
       type: 'postgres',
@@ -75,48 +80,34 @@ export class ConstantsProvider {
       dropSchema: this.NODE_ENV === 'test',
     };
 
-    // TODO: поменять ws rpc
-    // TODO: проверить exchangeAddress, routerAddresses, nativeCurrency.address
     this.chains = {
       [Network.BSC]: {
         name: 'Binance Smart Chain',
         rpcUrl: this.BSC_RPC_URL,
         rpcWsUrl: this.BSC_WS_RPC_URL,
         chain: bsc,
-        nativeCurrency: {
-          name: 'BNB',
-          symbol: 'BNB',
-          decimals: 18,
-          address: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
-        },
+        nativeToken: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c',
+        tokenName: 'BNB',
+        tokenSymbol: 'BNB',
+        tokenDecimals: 18,
         exchange: 'PancakeSwap',
-        routerAddresses: ['0x10ED43C718714eb63d5aA57B78B54704E256024E'],
-        exchangeAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+        routerAddress: '0x10ED43C718714eb63d5aA57B78B54704E256024E',
+        factoryAddress: '0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73',
       },
       [Network.POLYGON]: {
         name: 'Polygon',
         rpcUrl: this.POLYGON_RPC_URL,
         rpcWsUrl: this.POLYGON_WS_RPC_URL,
         chain: polygon,
-        nativeCurrency: {
-          name: 'POL',
-          symbol: 'POL',
-          decimals: 18,
-          address: '0x455e53CBB86018Ac2B8092FdCd39d8444AFFC3F6',
-        },
+        nativeToken: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+        tokenName: 'POL',
+        tokenSymbol: 'POL',
+        tokenDecimals: 18,
         exchange: 'Uniswap',
-        routerAddresses: ['0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'],
-        exchangeAddress: '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+        routerAddress: '0xedf6066a2b290C185783862C7F4776A2C8077AD1',
+        factoryAddress: '0x9e5A52f57b3038F1B8EeE45F28b3C1967e22799C',
       },
     };
-
-    Object.keys(Network).forEach(network => {
-      this.isChainMonitoring[network as Network] = false;
-      this.exchangeTestAddresses[network as Network] = {
-        exchangeAddress: '0x',
-        recipientAddress: '0x',
-      };
-    });
   }
 
   private getConfigValue(key: string, defaultValue: string): string {

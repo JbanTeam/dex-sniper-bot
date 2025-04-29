@@ -14,7 +14,12 @@ type CheckTokenParams = {
   network: Network;
 };
 
-type CheckTokenReturnType = { name: string; symbol: string; decimals: number };
+type CheckTokenReturnType = {
+  name: string;
+  symbol: string;
+  decimals: number;
+  pairAddresses: PairAddresses;
+};
 
 type GetBalanceParams = {
   chatId: number;
@@ -42,14 +47,30 @@ type DeployTestContractParams = { wallet: SessionWallet; token: SessionUserToken
 
 type Transaction = {
   eventName: string;
+  pairAddress: Address;
   routerAddress: Address;
   sender: Address;
+  to: Address;
   amountIn: bigint;
   amountOut: bigint;
   tokenIn: Address;
   tokenOut: Address;
   network: Network;
   data: string;
+};
+
+type PairAddresses = {
+  pairAddress: Address;
+  token0: Address;
+  token1: Address;
+};
+
+type TokenData = {
+  name: string;
+  symbol: string;
+  decimals: number;
+  existsTokenId: string;
+  pairAddresses: null | PairAddresses;
 };
 
 type BalanceInfo = {
@@ -77,4 +98,6 @@ export {
   DeployTestContractParams,
   Transaction,
   BalanceInfo,
+  PairAddresses,
+  TokenData,
 };

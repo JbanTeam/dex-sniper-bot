@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import { Injectable } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
@@ -8,10 +9,10 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { TgCommandHandler } from './handlers/TgCommandHandler';
 import { TgQueryHandler } from './handlers/TgQueryHandler';
 import { TgMessageHandler } from './handlers/TgMessageHandler';
+import { Replication } from '@modules/subscription/replication.entity';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { BotProviderInterface, IncomingMessage, IncomingQuery } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
-import { Replication } from '@modules/subscription/replication.entity';
 
 @Injectable()
 export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDeleteMsgParams> {
@@ -88,28 +89,10 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  async notifyUser({ userId, chatId, message }: { userId: number; chatId: number; message: string }) {
+  @OnEvent('notifyUser')
+  async notifyUser({ chatId, text }: { chatId: number; text: string }) {
     try {
-      const usersIds = await this.redisService.getUsersSet();
-      if (!usersIds.includes(chatId.toString())) {
-        return await this.sendMessage({ chatId, text: message });
-      }
-
-      const user = await this.userService.findById({ id: userId });
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
-
-      await this.redisService.addUser({
-        chatId: user.chatId,
-        action: 'get',
-        userId: user.id,
-        wallets: [...user.wallets],
-        tokens: [...user.tokens],
-        subscriptions: [...user.subscriptions],
-        replications: this.mapReplications(user.replications, chatId),
-      });
-      await this.sendMessage({ chatId: user.chatId, text: message });
+      await this.sendMessage({ chatId, text });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`Error notifying user: ${message}`);
@@ -213,6 +196,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         tokenId: replication.token.id,
         tokenSymbol: replication.token.symbol,
         tokenAddress: replication.token.address,
+        tokenDecimals: replication.token.decimals,
         subscriptionId: replication.subscription.id,
         subscriptionAddress: replication.subscription.address,
         chatId,

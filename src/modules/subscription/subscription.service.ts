@@ -1,15 +1,10 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 import { Subscription } from './subscription.entity';
 import { Replication } from './replication.entity';
-import { BlockchainService } from '../blockchain/blockchain.service';
-import { User } from '@modules/user/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
-import { Transaction } from '@modules/blockchain/types';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BotError } from '@src/errors/BotError';
 import {
@@ -28,13 +23,8 @@ export class SubscriptionService {
     private readonly subscriptionRepository: Repository<Subscription>,
     @InjectRepository(Replication)
     private readonly replicationRepository: Repository<Replication>,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
-    private readonly blockchainService: BlockchainService,
     private readonly redisService: RedisService,
     private readonly constants: ConstantsProvider,
-    private readonly configService: ConfigService,
-    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async subscribeToWallet({ chatId, address, network }: { chatId: number; address: Address; network: Network }) {
@@ -156,44 +146,6 @@ export class SubscriptionService {
     return reply;
   }
 
-  @OnEvent('handleTransaction')
-  async handleTransaction({ tx }: { tx: Transaction }) {
-    console.log('Network', tx.network);
-    console.log('Transaction LOG', tx);
-
-    const subscriptions = await this.findSubscriptionsByAddress(tx.sender);
-
-    if (!subscriptions?.length) return;
-
-    // for (const subscription of subscriptions) {
-    //   await this.replicateTransaction({ subscription, tx });
-    // }
-  }
-
-  // private async replicateTransaction({ subscription, tx }: { subscription: Subscription; tx: Transaction }) {
-  // try {
-  //   //Получаем данные о транзакции
-  //   const txData = await this.blockchainService.getTransactionData(tx.hash, wallet.network);
-  //   //Проверяем, достаточно ли средств на кошельке
-  //   const balance = await this.blockchainService.getBalance(wallet.address, wallet.network);
-  //   if (balance < tx.value) {
-  //     throw new Error('Insufficient funds');
-  //   }
-  //   //Повторяем транзакцию
-  //   const replicatedTxHash = await this.blockchainService.sendTransaction({
-  //     from: wallet.address,
-  //     to: txData.to,
-  //     value: txData.value,
-  //     data: txData.data,
-  //     network: wallet.network,
-  //   });
-  //   //Уведомляем пользователя об успешной транзакции
-  //   await this.notifyUser(user.chatId, `Transaction replicated: ${replicatedTxHash}`);
-  // } catch (error) {
-  //   console.log(error);
-  // }
-  // }
-
   async createOrUpdateReplication(tempReplication: TempReplication) {
     const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
     if (!chatId || !subscriptionId || !tokenId) {
@@ -216,6 +168,26 @@ export class SubscriptionService {
   async findById(id: number) {
     return await this.subscriptionRepository.findOne({
       where: { id },
+    });
+  }
+
+  async findSubscriptionsByAddress(address: Address): Promise<Subscription[]> {
+    return this.subscriptionRepository.find({
+      where: { address },
+      relations: ['user', 'user.wallets'],
+      select: {
+        id: true,
+        address: true,
+        network: true,
+        user: {
+          chatId: true,
+          wallets: {
+            address: true,
+            network: true,
+            encryptedPrivateKey: true,
+          },
+        },
+      },
     });
   }
 
@@ -244,10 +216,18 @@ export class SubscriptionService {
       throw new BotError('Replication not found', 'Репликация не найдена', 404);
     }
 
+    let tokenAddress = fullReplication.token.address;
+
+    if (this.constants.notProd) {
+      const testToken = userSession.testTokens?.find(t => t.id === tokenId);
+      tokenAddress = testToken?.address || fullReplication.token.address;
+    }
+    // TODO: prepareReplication
     const sessionReplication = {
       ...fullReplication,
-      tokenAddress: fullReplication.token.address,
+      tokenAddress,
       tokenSymbol: fullReplication.token.symbol,
+      tokenDecimals: fullReplication.token.decimals,
       subscriptionAddress: fullReplication.subscription.address,
       network: fullReplication.subscription.network,
       tokenId,
@@ -298,31 +278,5 @@ export class SubscriptionService {
     reply += `<u>Лимит на продажу:</u> <b>${existingReplication.sell}</b>\n`;
 
     return reply;
-  }
-
-  private async findByUserId({ userId, address, network }: { userId: number; address: Address; network: Network }) {
-    return await this.subscriptionRepository.findOne({
-      where: {
-        user: { id: userId },
-        address,
-        network,
-      },
-    });
-  }
-
-  private async findSubscriptionsByAddress(address: Address): Promise<Subscription[]> {
-    return this.subscriptionRepository.find({
-      where: { address },
-      relations: ['user'],
-      select: {
-        id: true,
-        address: true,
-        network: true,
-        user: {
-          id: true,
-          chatId: true,
-        },
-      },
-    });
   }
 }

@@ -53,15 +53,13 @@ export type ViemChainConfig = {
   rpcUrl: string;
   rpcWsUrl: string;
   chain: Chain;
-  nativeCurrency: {
-    name: string;
-    symbol: string;
-    decimals: number;
-    address: Address;
-  };
+  nativeToken: Address;
+  tokenName: string;
+  tokenSymbol: string;
+  tokenDecimals: number;
   exchange: string;
-  routerAddresses: Address[];
-  exchangeAddress: Address;
+  routerAddress: Address;
+  factoryAddress: Address;
 };
 
 export type ChainsType = {
@@ -113,6 +111,7 @@ export type SessionReplication = {
   tokenId: number;
   tokenSymbol: string;
   tokenAddress: Address;
+  tokenDecimals: number;
   subscriptionId: number;
   subscriptionAddress: Address;
 };

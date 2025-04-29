@@ -1,5 +1,5 @@
 import { anvil } from 'viem/chains';
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import {
   createWalletClient,
   createPublicClient,
@@ -13,13 +13,14 @@ import {
   WalletClient,
   PublicClient,
   formatEther,
-  erc20Abi as anvilAbi,
+  erc20Abi,
 } from 'viem';
 
 import { isNetwork } from '@src/types/typeGuards';
 import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { ViemHelperProvider } from '../viem-helper.provider';
 import { abi as coinAbi, bytecode as coinBytecode } from '@src/contract-artifacts/MyToken.json';
 import { abi as factoryAbi, bytecode as factoryBytecode } from '@src/contract-artifacts/UniswapV2Factory.json';
 import { abi as routerAbi, bytecode as routerBytecode } from '@src/contract-artifacts/UniswapV2Router02.json';
@@ -32,7 +33,9 @@ import {
   ViemClientsType,
   DeployContractParams,
   CachedContractsType,
+  ErcSwapFnType,
 } from '../types';
+import { PairAddresses } from '@modules/blockchain/types';
 
 @Injectable()
 export class AnvilProvider {
@@ -45,6 +48,8 @@ export class AnvilProvider {
   constructor(
     private readonly redisService: RedisService,
     private readonly constants: ConstantsProvider,
+    @Inject(forwardRef(() => ViemHelperProvider))
+    private readonly viemHelper: ViemHelperProvider,
   ) {
     this.rpcUrl = this.constants.ANVIL_RPC_URL;
     this.rpcWsUrl = this.constants.ANVIL_WS_RPC_URL;
@@ -61,75 +66,21 @@ export class AnvilProvider {
   async initTestDex() {
     const { exchangeAddress } = this.constants.anvilAddresses;
     this.cachedContracts = await this.redisService.getCachedContracts();
+    const { nativeToken, factoryAddress, routerAddress } = this.cachedContracts;
 
-    if (!this.cachedContracts.wbnb) {
-      console.log('Deploying WBNB...');
-      const hash = await this.walletClient.deployContract({
-        abi: wbnbAbi,
-        chain: anvil,
-        bytecode: wbnbBytecode as `0x${string}`,
-        account: exchangeAddress,
-      });
-      const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-      if (!receipt.contractAddress) {
-        throw new BotError(`WBNB not created ❌`, `WBNB не был создан ❌`, 400);
-      }
-      this.cachedContracts.wbnb = receipt.contractAddress.toLowerCase() as Address;
+    if (!nativeToken) await this.deployWbnb(exchangeAddress);
+    if (!factoryAddress) await this.deployFactory(exchangeAddress);
+    if (!routerAddress) await this.deployRouter(exchangeAddress);
 
-      console.log('Depositing ETH to WBNB...');
-      await this.walletClient.writeContract({
-        address: this.cachedContracts.wbnb,
-        abi: wbnbAbi,
-        functionName: 'deposit',
-        chain: anvil,
-        account: exchangeAddress,
-        value: parseEther('100'),
-      });
-    }
-
-    if (!this.cachedContracts.factory) {
-      console.log('Deploying Factory...');
-      const hash = await this.walletClient.deployContract({
-        abi: factoryAbi,
-        bytecode: factoryBytecode as `0x${string}`,
-        chain: anvil,
-        account: exchangeAddress,
-        args: ['0x0000000000000000000000000000000000000000'],
-      });
-      const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-      if (!receipt.contractAddress) {
-        throw new BotError(`Factory not created ❌`, `Factory не был создан ❌`, 400);
-      }
-      this.cachedContracts.factory = receipt.contractAddress.toLowerCase() as Address;
-    }
-
-    if (!this.cachedContracts.router) {
-      console.log('Deploying Router...');
-      const hash = await this.walletClient.deployContract({
-        abi: routerAbi,
-        bytecode: routerBytecode as `0x${string}`,
-        chain: anvil,
-        account: exchangeAddress,
-        args: [this.cachedContracts.factory, this.cachedContracts.wbnb],
-      });
-      const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-      if (!receipt.contractAddress) {
-        throw new BotError(`Router not created ❌`, `Router не был создан ❌`, 400);
-      }
-      this.cachedContracts.router = receipt.contractAddress.toLowerCase() as Address;
-
-      console.log('Approving Router for WBNB...');
-      await this.walletClient.writeContract({
-        address: this.cachedContracts.wbnb,
-        abi: wbnbAbi,
-        functionName: 'approve',
-        chain: anvil,
-        args: [this.cachedContracts.router, 2n ** 256n - 1n],
-        account: exchangeAddress,
-      });
-
+    if (!nativeToken || !factoryAddress || !routerAddress) {
       await this.redisService.setHashFeilds('cachedContracts', this.cachedContracts);
     }
+  }
+
+  async initTestAddresses() {
+    const [exchangeAddress, recipientAddress] = await this.walletClient.getAddresses();
+    this.constants.anvilAddresses.exchangeAddress = exchangeAddress;
+    this.constants.anvilAddresses.recipientAddress = recipientAddress;
   }
 
   createClients(): ViemClientsType {
@@ -155,62 +106,46 @@ export class AnvilProvider {
     );
   }
 
-  async deployTestContract({
-    token,
-    count = '1000000000',
-    walletAddress,
-  }: DeployTestContractParams): Promise<SessionUserToken> {
-    const { name, symbol, decimals } = token;
-    const { exchangeAddress, contractAddress } = await this.deployContract({
+  async createTestToken({ token, count = '1000000000', walletAddress }: DeployTestContractParams) {
+    const { name, symbol, decimals, network } = token;
+    const { exchangeAddress, tokenAddress, pairAddresses } = await this.createToken({
       name,
       symbol,
       decimals,
       count,
+      network,
     });
 
-    await this.getBalance({ contractAddress, testAccount: exchangeAddress, name, decimals });
-    await this.sendTestTokens({ contractAddress, testAccount: exchangeAddress, walletAddress, decimals });
+    await this.getBalance({ tokenAddress, walletAddress: exchangeAddress, name, decimals });
+    await this.sendTestTokens({ tokenAddress, sender: exchangeAddress, walletAddress, decimals });
 
     return {
-      ...token,
-      address: contractAddress,
+      token: {
+        ...token,
+        address: tokenAddress,
+      },
+      pairAddresses,
     };
-  }
-
-  async initTestAddresses() {
-    const [exchangeAddress, recipientAddress] = await this.walletClient.getAddresses();
-    this.constants.anvilAddresses.exchangeAddress = exchangeAddress;
-    this.constants.anvilAddresses.recipientAddress = recipientAddress;
   }
 
   async sendFakeSwap(testToken: SessionUserToken) {
     const { recipientAddress } = this.constants.anvilAddresses;
 
     const value = parseEther('1');
-    const path = [this.cachedContracts.wbnb, testToken.address];
+    const path = [this.cachedContracts.nativeToken, testToken.address];
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 60);
 
-    const hash = await this.walletClient.writeContract({
-      address: this.cachedContracts.router,
-      abi: routerAbi,
-      functionName: 'swapExactETHForTokens',
-      args: [0n, path, recipientAddress, deadline],
-      chain: anvil,
-      account: recipientAddress,
+    await this.swap({
+      recipientAddress,
       value,
+      deadline,
+      path,
+      fn: 'swapExactETHForTokens',
     });
 
-    console.log('#️⃣ Swap tx hash:', hash);
-
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-
-    if (receipt.status !== 'success') {
-      throw new BotError(`Swap failed ❌`, `Обмен BNB на ${testToken.name} не удался ❌`, 400);
-    }
-
     await this.getBalance({
-      contractAddress: testToken.address,
-      testAccount: recipientAddress,
+      tokenAddress: testToken.address,
+      walletAddress: recipientAddress,
       name: testToken.name,
       decimals: testToken.decimals,
     });
@@ -234,12 +169,91 @@ export class AnvilProvider {
     }
   }
 
-  private async deployContract({ name, symbol, decimals, count }: DeployContractParams): Promise<{
+  private async createToken({ name, symbol, decimals, count, network }: DeployContractParams): Promise<{
     exchangeAddress: Address;
-    contractAddress: Address;
+    tokenAddress: Address;
+    pairAddresses: PairAddresses;
   }> {
     const { exchangeAddress } = this.constants.anvilAddresses;
 
+    const tokenAddress = await this.deployToken({ exchangeAddress, name, symbol, decimals, count });
+    await this.depositWbnb(exchangeAddress);
+    await this.approve(exchangeAddress, tokenAddress);
+    await this.addLiquidity(exchangeAddress, tokenAddress, network, decimals);
+
+    const nativeToken = this.cachedContracts.nativeToken;
+    const factoryAddress = this.cachedContracts.factoryAddress;
+    const pairAddresses = await this.viemHelper.getPair(tokenAddress, nativeToken, factoryAddress, this.publicClient);
+
+    return { exchangeAddress, tokenAddress, pairAddresses };
+  }
+
+  private async getBalance({ tokenAddress, walletAddress, decimals, name }: TestBalanceParams) {
+    const nativeBalance = await this.publicClient.getBalance({ address: walletAddress });
+
+    const balance = await this.viemHelper.balanceOf({ tokenAddress, walletAddress, publicClient: this.publicClient });
+
+    const formattedBalance = formatUnits(balance, decimals);
+    const formattedNativeBalance = formatEther(nativeBalance);
+
+    console.log(`💰 Native Баланс:`, formattedNativeBalance);
+    console.log(`💰 Баланс ${name}:`, formattedBalance);
+  }
+
+  private async sendTestTokens({ tokenAddress, sender, walletAddress, decimals }: SendTestTokenParams) {
+    const amount = parseUnits('1000000.0', decimals);
+
+    const hash = await this.walletClient.writeContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      chain: anvil,
+      functionName: 'transfer',
+      args: [walletAddress, amount],
+      account: sender,
+    });
+
+    console.log('#️⃣ Transaction hash:', hash);
+
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+
+    if (receipt.status !== 'success') {
+      throw new BotError(`Test tokens not sent ❌`, `Тестовый токены не были отправлены ❌`, 400);
+    }
+
+    console.log('✅ Токены отправлены', receipt);
+  }
+
+  private async deployWbnb(exchangeAddress: Address) {
+    console.log('Deploying WBNB...');
+    const hash = await this.walletClient.deployContract({
+      abi: wbnbAbi,
+      bytecode: wbnbBytecode as `0x${string}`,
+      chain: anvil,
+      account: exchangeAddress,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    if (!receipt.contractAddress) {
+      throw new BotError(`WBNB not created ❌`, `WBNB не был создан ❌`, 400);
+    }
+    this.cachedContracts.nativeToken = receipt.contractAddress.toLowerCase() as Address;
+
+    await this.depositWbnb(exchangeAddress);
+  }
+
+  private async deployToken({
+    exchangeAddress,
+    name,
+    symbol,
+    decimals,
+    count,
+  }: {
+    exchangeAddress: Address;
+    name: string;
+    symbol: string;
+    decimals: number;
+    count: string;
+  }) {
+    console.log(`Deploying ${name}...`);
     const txHash = await this.walletClient.deployContract({
       abi: coinAbi,
       chain: anvil,
@@ -256,12 +270,16 @@ export class AnvilProvider {
       throw new BotError(`Test contract ${name} not created ❌`, `Тестовый контракт ${name} не был создан ❌`, 400);
     }
 
-    const contractAddress = receipt.contractAddress.toLowerCase() as Address;
-    console.log(`✅ Контракт развернут по адресу: ${contractAddress}`);
+    const tokenAddress = receipt.contractAddress.toLowerCase() as Address;
+    console.log(`✅ Контракт развернут по адресу: ${tokenAddress}`);
 
+    return tokenAddress;
+  }
+
+  private depositWbnb(exchangeAddress: Address) {
     console.log('Depositing WBNB...');
-    await this.walletClient.writeContract({
-      address: this.cachedContracts.wbnb,
+    return this.walletClient.writeContract({
+      address: this.cachedContracts.nativeToken,
       abi: wbnbAbi,
       functionName: 'deposit',
       args: [],
@@ -269,28 +287,106 @@ export class AnvilProvider {
       value: parseEther('100'),
       account: exchangeAddress,
     });
+  }
 
-    console.log('Approving Router for token...');
+  private async deployFactory(exchangeAddress: Address) {
+    console.log('Deploying Factory...');
+    const hash = await this.walletClient.deployContract({
+      abi: factoryAbi,
+      bytecode: factoryBytecode as `0x${string}`,
+      chain: anvil,
+      account: exchangeAddress,
+      args: ['0x0000000000000000000000000000000000000000'],
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    if (!receipt.contractAddress) {
+      throw new BotError(`Factory not created ❌`, `Factory не был создан ❌`, 400);
+    }
+    this.cachedContracts.factoryAddress = receipt.contractAddress.toLowerCase() as Address;
+  }
+
+  private async deployRouter(exchangeAddress: Address) {
+    console.log('Deploying Router...');
+    const hash = await this.walletClient.deployContract({
+      abi: routerAbi,
+      bytecode: routerBytecode as `0x${string}`,
+      chain: anvil,
+      account: exchangeAddress,
+      args: [this.cachedContracts.factoryAddress, this.cachedContracts.nativeToken],
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    if (!receipt.contractAddress) {
+      throw new BotError(`Router not created ❌`, `Router не был создан ❌`, 400);
+    }
+    this.cachedContracts.routerAddress = receipt.contractAddress.toLowerCase() as Address;
+
+    console.log('Approving Router for WBNB...');
     await this.walletClient.writeContract({
-      address: contractAddress,
-      abi: coinAbi,
+      address: this.cachedContracts.nativeToken,
+      abi: wbnbAbi,
       functionName: 'approve',
       chain: anvil,
-      args: [this.cachedContracts.router, 2n ** 256n - 1n],
+      args: [this.cachedContracts.routerAddress, 2n ** 256n - 1n],
       account: exchangeAddress,
     });
+  }
 
-    console.log('Adding liquidity...');
+  private async approve(exchangeAddress: Address, tokenAddress: Address) {
+    console.log('Approving Router for token...');
     await this.walletClient.writeContract({
-      address: this.cachedContracts.router,
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: 'approve',
+      chain: anvil,
+      args: [this.cachedContracts.routerAddress, 2n ** 256n - 1n],
+      account: exchangeAddress,
+    });
+  }
+
+  private async swap({
+    recipientAddress,
+    value,
+    deadline,
+    path,
+    fn,
+  }: {
+    recipientAddress: Address;
+    value: bigint;
+    deadline: bigint;
+    path: Address[];
+    fn: ErcSwapFnType;
+  }) {
+    const hash = await this.walletClient.writeContract({
+      address: this.cachedContracts.routerAddress,
+      abi: routerAbi,
+      functionName: fn,
+      args: [0n, path, recipientAddress, deadline],
+      chain: anvil,
+      account: recipientAddress,
+      value,
+    });
+    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== 'success') {
+      throw new BotError(`Swap not done ❌`, `Swap не был выполнен ❌`, 400);
+    }
+
+    console.log('#️⃣ Swap tx hash:', hash);
+  }
+
+  private async addLiquidity(exchangeAddress: Address, tokenAddress: Address, network: Network, decimals: number) {
+    console.log('Adding liquidity...');
+    const nativeToken = this.cachedContracts.nativeToken;
+    const nativeDecimals = this.constants.chains[network].tokenDecimals;
+    const hash = await this.walletClient.writeContract({
+      address: this.cachedContracts.routerAddress,
       abi: routerAbi,
       functionName: 'addLiquidity',
       chain: anvil,
       args: [
-        contractAddress,
-        this.cachedContracts.wbnb,
-        parseEther('100000'),
-        parseEther('100'),
+        tokenAddress,
+        nativeToken,
+        parseUnits('100000', decimals),
+        parseUnits('100', nativeDecimals),
         0n,
         0n,
         exchangeAddress,
@@ -299,46 +395,10 @@ export class AnvilProvider {
       account: exchangeAddress,
     });
 
-    return { exchangeAddress, contractAddress };
-  }
-
-  private async getBalance({ contractAddress, testAccount, decimals, name }: TestBalanceParams) {
-    const nativeBalance = await this.publicClient.getBalance({ address: testAccount });
-
-    const balance = await this.publicClient.readContract({
-      address: contractAddress,
-      abi: anvilAbi,
-      functionName: 'balanceOf',
-      args: [testAccount],
-    });
-
-    const formattedBalance = formatUnits(balance, decimals);
-    const formattedNativeBalance = formatEther(nativeBalance);
-
-    console.log(`💰 Native Баланс:`, formattedNativeBalance);
-    console.log(`💰 Баланс ${name}:`, formattedBalance);
-  }
-
-  private async sendTestTokens({ contractAddress, testAccount, walletAddress, decimals }: SendTestTokenParams) {
-    const amount = parseUnits('1000000.0', decimals);
-
-    const hash = await this.walletClient.writeContract({
-      address: contractAddress,
-      abi: anvilAbi,
-      chain: anvil,
-      functionName: 'transfer',
-      args: [walletAddress, amount],
-      account: testAccount,
-    });
-
-    console.log('#️⃣ Transaction hash:', hash);
-
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`Test tokens not sent ❌`, `Тестовый токены не были отправлены ❌`, 400);
+      throw new BotError(`Liquidity not added ❌`, `Ликвидность не была добавлена ❌`, 400);
     }
-
-    console.log('✅ Токены отправлены', receipt);
   }
 }

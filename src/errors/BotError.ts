@@ -5,6 +5,7 @@ export class BotError extends Error {
     message: string,
     public readonly userMessage: string,
     public readonly statusCode: number,
+    public chatId?: number,
     public incomingMessage?: IncomingMessage | IncomingQuery,
   ) {
     super(message);

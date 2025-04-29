@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
@@ -8,7 +8,7 @@ import { SubscriptionService } from '@modules/subscription/subscription.service'
 import { WalletService } from '@modules/wallet/wallet.service';
 import { strIsPositiveNumber } from '@src/utils/utils';
 import { IncomingQuery } from '@src/types/types';
-import { TgCommandReturnType, TgQueryFunction } from '../types/types';
+import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
 import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 
@@ -21,7 +21,8 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     private readonly subscriptionService: SubscriptionService,
     private readonly walletService: WalletService,
   ) {
-    super();
+    const logger = new Logger(TgQueryHandler.name);
+    super(logger);
   }
 
   handleQuery: TgQueryFunction = async query => {
@@ -46,153 +47,191 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   };
 
   addTokenCb: TgQueryFunction = async query => {
-    const [, network] = query.data.split('-');
-    const userSession = await this.redisService.getUser(query.chatId);
+    try {
+      const [, network] = query.data.split('-');
+      const userSession = await this.redisService.getUser(query.chatId);
 
-    if (!userSession.tempToken) throw new BotError('Token not found', 'Токен не найден', 404);
-    isEtherAddress(userSession.tempToken);
+      if (!userSession.tempToken) throw new BotError('Token not found', 'Токен не найден', 404);
+      isEtherAddress(userSession.tempToken);
 
-    if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
-    isNetwork(network);
+      if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
+      isNetwork(network);
 
-    const { tokens } = await this.userService.addToken({
-      userSession,
-      address: userSession.tempToken,
-      network: network,
-    });
+      const { tokens } = await this.userService.addToken({
+        userSession,
+        address: userSession.tempToken,
+        network: network,
+      });
 
-    let reply = `Токен успешно добавлен 🔥🔥🔥\n\n<u>Ваши токены:</u>\n`;
+      let reply = `Токен успешно добавлен 🔥🔥🔥\n\n<u>Ваши токены:</u>\n`;
 
-    tokens.forEach((token, index) => {
-      reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
-    });
+      tokens.forEach((token, index) => {
+        reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
+      });
 
-    return { text: reply, options: { parse_mode: 'html' } };
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while adding token', 'Ошибка при добавлении токена');
+    }
   };
 
   removeTokenCb: TgQueryFunction = async query => {
-    let reply = '';
-    const network = query.data.split('-')[1];
-    const chatId = query.chatId;
+    try {
+      let reply = '';
+      const network = query.data.split('-')[1];
+      const chatId = query.chatId;
 
-    isValidRemoveQueryData(network);
+      isValidRemoveQueryData(network);
 
-    if (network === 'all') {
-      await this.userService.removeToken({ chatId });
+      if (network === 'all') {
+        await this.userService.removeToken({ chatId });
 
-      reply = `Все токены успешно удалены 🔥🔥🔥`;
-    } else {
-      await this.userService.removeToken({ chatId, network });
+        reply = `Все токены успешно удалены 🔥🔥🔥`;
+      } else {
+        await this.userService.removeToken({ chatId, network });
 
-      reply = `Все токены в сети ${network} успешно удалены 🔥🔥🔥`;
+        reply = `Все токены в сети ${network} успешно удалены 🔥🔥🔥`;
+      }
+
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while removing token', 'Ошибка при удалении токена');
     }
-
-    return { text: reply, options: { parse_mode: 'html' } };
   };
 
   getBalanceCb: TgQueryFunction = async query => {
-    const walletId = +query.data.split('-')[1];
-    const wallets = await this.redisService.getWallets(query.chatId);
-    const wallet = wallets?.find(wallet => wallet.id === walletId);
+    try {
+      const walletId = +query.data.split('-')[1];
+      const wallets = await this.redisService.getWallets(query.chatId);
+      const wallet = wallets?.find(wallet => wallet.id === walletId);
 
-    if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
 
-    const balance = await this.blockchainService.getBalance({
-      chatId: query.chatId,
-      address: wallet.address,
-      network: wallet.network,
-    });
+      const balance = await this.blockchainService.getBalance({
+        chatId: query.chatId,
+        address: wallet.address,
+        network: wallet.network,
+      });
 
-    return { text: balance, options: { parse_mode: 'html' } };
+      return { text: balance, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while getting balance', 'Ошибка при получении баланса');
+    }
   };
 
   subscribeCb: TgQueryFunction = async query => {
-    const [, network] = query.data.split('-');
+    try {
+      const [, network] = query.data.split('-');
 
-    const tempWallet = await this.redisService.getTempWallet(query.chatId);
+      const tempWallet = await this.redisService.getTempWallet(query.chatId);
 
-    if (!tempWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
-    isEtherAddress(tempWallet);
+      if (!tempWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+      isEtherAddress(tempWallet);
 
-    if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
-    isNetwork(network);
+      if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
+      isNetwork(network);
 
-    await this.subscriptionService.subscribeToWallet({
-      chatId: query.chatId,
-      address: tempWallet,
-      network: network,
-    });
+      await this.subscriptionService.subscribeToWallet({
+        chatId: query.chatId,
+        address: tempWallet,
+        network: network,
+      });
 
-    return { text: `Кошелек добавлен в список для отслеживания ✅`, options: { parse_mode: 'html' } };
+      return { text: `Кошелек добавлен в список для отслеживания ✅`, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while subscribing to wallet', 'Ошибка при подписке на кошелек');
+    }
   };
 
   sendTokensCb: TgQueryFunction = async query => {
-    const [, network] = query.data.split('-');
-    const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
+    try {
+      const [, network] = query.data.split('-');
+      const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
 
-    if (!tempSendTokens) throw new BotError('Error sending tokens', 'Ошибка отправки токенов', 400);
-    const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
+      if (!tempSendTokens) throw new BotError('Error sending tokens', 'Ошибка отправки токенов', 400);
+      const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
 
-    isNetwork(network);
-    isEtherAddress(tokenAddress);
-    isEtherAddress(recipientAddress);
-    if (!strIsPositiveNumber(amount)) {
-      throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
+      isNetwork(network);
+      isEtherAddress(tokenAddress);
+      isEtherAddress(recipientAddress);
+      if (!strIsPositiveNumber(amount)) {
+        throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
+      }
+
+      const userSession = await this.redisService.getUser(query.chatId);
+      const wallet = userSession.wallets.find(wallet => wallet.network === network);
+      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+      const token = userSession.tokens.find(token => token.address === tokenAddress);
+      if (!token) {
+        throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
+      }
+
+      const fullWallet = await this.walletService.findByAddress(wallet.address);
+      if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+
+      await this.blockchainService.sendTokens({
+        userSession,
+        wallet: fullWallet,
+        token,
+        amount,
+        recipientAddress,
+      });
+
+      return { text: `Токены успешно отправлены ✅`, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while sending tokens', 'Ошибка при отправке токенов');
     }
-
-    const userSession = await this.redisService.getUser(query.chatId);
-    const wallet = userSession.wallets.find(wallet => wallet.network === network);
-    if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
-    const token = userSession.tokens.find(token => token.address === tokenAddress);
-    if (!token) {
-      throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
-    }
-
-    const fullWallet = await this.walletService.findByAddress(wallet.address);
-    if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
-
-    await this.blockchainService.sendTokens({
-      userSession,
-      wallet: fullWallet,
-      token,
-      amount,
-      recipientAddress,
-    });
-
-    return { text: `Токены успешно отправлены ✅`, options: { parse_mode: 'html' } };
   };
 
   replicateCb: TgQueryFunction = async query => {
-    const [, tokenId] = query.data.split('-');
-    const tempReplication = await this.redisService.getTempReplication(query.chatId);
-    if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
+    try {
+      const [, tokenId] = query.data.split('-');
+      const tempReplication = await this.redisService.getTempReplication(query.chatId);
+      if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
 
-    tempReplication.tokenId = +tokenId;
-    const reply = await this.subscriptionService.createOrUpdateReplication(tempReplication);
+      tempReplication.tokenId = +tokenId;
+      const reply = await this.subscriptionService.createOrUpdateReplication(tempReplication);
 
-    return { text: `Параметры повтора сделок установлены ✅\n\n${reply}`, options: { parse_mode: 'html' } };
+      return { text: `Параметры повтора сделок установлены ✅\n\n${reply}`, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while setting replication', 'Ошибка при установке повтора сделок');
+    }
   };
 
+  handleError(error: unknown, errMsg: string, userMsg: string): { text: string; options?: TgSendMessageOptions } {
+    this.logger.error(`${errMsg}`, error);
+
+    if (error instanceof BotError) {
+      return { text: error.userMessage, options: { parse_mode: 'html' } };
+    }
+
+    return { text: userMsg, options: { parse_mode: 'html' } };
+  }
+
   private replicateSetSubscription: TgQueryFunction = async query => {
-    const [, subscriptionId, network] = query.data.split('-');
-    isNetwork(network);
+    try {
+      const [, subscriptionId, network] = query.data.split('-');
+      isNetwork(network);
 
-    const tempReplication = await this.redisService.getTempReplication(query.chatId);
-    if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
+      const tempReplication = await this.redisService.getTempReplication(query.chatId);
+      if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
 
-    tempReplication.subscriptionId = +subscriptionId;
-    tempReplication.network = network;
-    await this.redisService.setUserField(query.chatId, 'tempReplication', JSON.stringify(tempReplication));
+      tempReplication.subscriptionId = +subscriptionId;
+      tempReplication.network = network;
+      await this.redisService.setUserField(query.chatId, 'tempReplication', JSON.stringify(tempReplication));
 
-    const tokens = await this.redisService.getTokens(query.chatId, 'tokens');
+      const tokens = await this.redisService.getTokens(query.chatId, 'tokens');
 
-    const keyboard = tokens?.map(token => {
-      return [{ text: `${token.name} (${token.symbol})`, callback_data: `repltoken-${token.id}` }];
-    });
+      const keyboard = tokens?.map(token => {
+        return [{ text: `${token.name} (${token.symbol})`, callback_data: `repltoken-${token.id}` }];
+      });
 
-    return {
-      text: 'Выберите токен для установки параметров:',
-      options: { reply_markup: { inline_keyboard: keyboard } },
-    };
+      return {
+        text: 'Выберите токен для установки параметров:',
+        options: { reply_markup: { inline_keyboard: keyboard } },
+      };
+    } catch (error) {
+      return this.handleError(error, 'Error while setting replication', 'Ошибка при установке повтора сделок');
+    }
   };
 }

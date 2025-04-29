@@ -55,8 +55,9 @@ export class BlockchainService {
     return provider.sendTokens(sendTokensParams);
   }
 
-  async deployTestContract({ wallet, token }: DeployTestContractParams) {
-    return this.anvilProvider.deployTestContract({
+  async createTestToken({ wallet, token }: DeployTestContractParams) {
+    // TODO: testProviders
+    return this.anvilProvider.createTestToken({
       walletAddress: wallet.address,
       token,
     });

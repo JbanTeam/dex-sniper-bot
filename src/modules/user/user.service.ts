@@ -1,5 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EntityManager, Repository } from 'typeorm';
 
 import { User } from './user.entity';
@@ -7,8 +8,10 @@ import { UserToken } from './user-token.entity';
 import { RegisterDto } from './dto/register.dto';
 import { BotError } from '@src/errors/BotError';
 import { isNetwork } from '@src/types/typeGuards';
+import { TokenData } from '@modules/blockchain/types';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { Network, SessionUserToken } from '@src/types/types';
 import {
   AddTokenParams,
@@ -18,12 +21,9 @@ import {
   RemoveTokenParams,
   UpdateTokenStorageParams,
 } from './types';
-import { ConstantsProvider } from '@modules/constants/constants.provider';
 
 @Injectable()
 export class UserService {
-  private readonly nodeEnv: string;
-  private readonly notProd: boolean;
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -32,10 +32,8 @@ export class UserService {
     private readonly blockchainService: BlockchainService,
     private readonly redisService: RedisService,
     private readonly constants: ConstantsProvider,
-  ) {
-    this.nodeEnv = this.constants.NODE_ENV;
-    this.notProd = this.nodeEnv !== 'production';
-  }
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getOrCreateUser({ chatId }: RegisterDto): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
@@ -72,11 +70,22 @@ export class UserService {
   async addToken({ userSession, address, network }: AddTokenParams): Promise<{ tokens: SessionUserToken[] }> {
     this.validateTokenAddition({ userSession, address, network });
 
-    const { tokens, sessionToken, existsTokenId } = await this.createAndSaveToken({ userSession, address, network });
+    const { tokens, sessionToken, existsTokenId, pairAddresses } = await this.createAndSaveToken({
+      userSession,
+      address,
+      network,
+    });
 
-    if (this.notProd) {
+    if (pairAddresses) {
+      const { pairAddress, token0, token1 } = pairAddresses;
+      await this.redisService.addPair({ network, pairAddress, token0, token1, prefix: 'pair' });
+    }
+
+    if (this.constants.notProd) {
       await this.createTestToken({ userSession, sessionToken, existsTokenId });
     }
+
+    if (pairAddresses) this.eventEmitter.emit('monitorDex', { network });
 
     return { tokens };
   }
@@ -187,7 +196,10 @@ export class UserService {
   }
 
   private async createAndSaveToken({ userSession, address, network }: AddTokenParams) {
-    const { name, symbol, decimals, existsTokenId } = await this.getTokenData({ address, network });
+    const { name, symbol, decimals, existsTokenId, pairAddresses } = await this.getTokenData({
+      address,
+      network,
+    });
 
     const token = this.createTokenEntity({ userSession, address, network, name, symbol, decimals });
     const savedToken = await this.userTokenRepository.save(token);
@@ -197,29 +209,20 @@ export class UserService {
 
     await this.updateTokenStorage({ chatId: userSession.chatId, tokens, token: sessionToken });
 
-    return { tokens, sessionToken, existsTokenId };
+    return { tokens, sessionToken, existsTokenId, pairAddresses };
   }
 
-  private async getTokenData({ address, network }: Omit<AddTokenParams, 'userSession'>) {
+  private async getTokenData({ address, network }: Omit<AddTokenParams, 'userSession'>): Promise<TokenData> {
     const exists = await this.redisService.existsInSet(`tokens:${network}`, address);
 
     if (exists) {
       const existsToken = await this.redisService.getHashFeilds(`token:${address}`);
-      return {
-        name: existsToken.name,
-        symbol: existsToken.symbol,
-        decimals: Number(existsToken.decimals),
-        existsTokenId: existsToken.id,
-      };
+      const { name, symbol, decimals, id } = existsToken;
+      return { name, symbol, decimals: Number(decimals), existsTokenId: id, pairAddresses: null };
     }
 
     const tokenData = await this.blockchainService.checkToken({ address, network });
-    return {
-      name: tokenData.name,
-      symbol: tokenData.symbol,
-      decimals: tokenData.decimals,
-      existsTokenId: '',
-    };
+    return { ...tokenData, existsTokenId: '' };
   }
 
   private createTokenEntity(tokenEntityParams: CreateTokenEntityParams) {
@@ -249,7 +252,13 @@ export class UserService {
       const wallet = userSession.wallets.find(w => w.network === sessionToken.network);
       if (!wallet) throw new BotError('Wallet not found', 'Кошелек для сети не найден', 404);
 
-      testToken = await this.blockchainService.deployTestContract({ wallet, token: sessionToken });
+      const testTokenData = await this.blockchainService.createTestToken({ wallet, token: sessionToken });
+      const { token, pairAddresses } = testTokenData;
+      const { pairAddress, token0, token1 } = pairAddresses;
+      const { network } = token;
+      testToken = token;
+
+      await this.redisService.addPair({ network, pairAddress, token0, token1, prefix: 'testPair' });
     } else {
       testToken.id = sessionToken.id;
     }
