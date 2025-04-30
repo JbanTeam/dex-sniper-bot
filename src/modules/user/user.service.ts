@@ -5,7 +5,6 @@ import { EntityManager, Repository } from 'typeorm';
 
 import { User } from './user.entity';
 import { UserToken } from './user-token.entity';
-import { RegisterDto } from './dto/register.dto';
 import { BotError } from '@src/errors/BotError';
 import { isNetwork } from '@src/types/typeGuards';
 import { TokenData } from '@modules/blockchain/types';
@@ -35,7 +34,7 @@ export class UserService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async getOrCreateUser({ chatId }: RegisterDto): Promise<{ action: string; user: User | null }> {
+  async getOrCreateUser({ chatId }: { chatId: number }): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
     let user = await this.findById({ chatId });
 
@@ -138,6 +137,21 @@ export class UserService {
     if (!deleteResult.affected) throw new BotError('Tokens not deleted', 'Токены не удалены', 400);
 
     await this.redisService.removeToken({ userSession, deleteConditions });
+  }
+
+  async getWallets(chatId: number): Promise<string> {
+    const userSession = await this.redisService.getUser(chatId);
+    if (!userSession.wallets.length) {
+      throw new BotError('You have no wallets', 'У вас нет кошельков', 404);
+    }
+
+    let reply = `<u>Ваши кошельки:</u>\n`;
+
+    userSession.wallets.forEach((wallet, index) => {
+      reply += `${index + 1}. <b>${wallet.network}:</b>\n<code>${wallet.address}</code>\n\n`;
+    });
+
+    return reply;
   }
 
   async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {

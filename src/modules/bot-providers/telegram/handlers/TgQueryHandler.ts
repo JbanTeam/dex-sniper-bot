@@ -97,7 +97,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
-      return this.handleError(error, 'Error while removing token', 'Ошибка при удалении токена');
+      return this.handleError(error, 'Error while removing tokens', 'Ошибка при удалении токенов');
     }
   };
 

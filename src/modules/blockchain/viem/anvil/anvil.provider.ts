@@ -85,11 +85,9 @@ export class AnvilProvider {
 
   createClients(): ViemClientsType {
     const chainsArr = Object.keys(ViemNetwork);
-    // TODO: test anvil chain
     return chainsArr.reduce(
       (clients, keyNetwork) => {
         isNetwork(keyNetwork);
-        // const value = this.constants.chains[keyNetwork];
         clients.public[keyNetwork] = createPublicClient({
           chain: anvil,
           transport: http(this.rpcUrl),

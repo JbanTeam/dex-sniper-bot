@@ -92,10 +92,11 @@ export class SubscriptionService {
     const groupedSubscriptions = subscriptions.reduce(
       (acc, subscription) => {
         const exchange = this.constants.chains[subscription.network].exchange;
-        if (!acc[exchange]) {
-          acc[exchange] = [];
+        const key = `${exchange} (${subscription.network})`;
+        if (!acc[key]) {
+          acc[key] = [];
         }
-        acc[exchange].push(subscription);
+        acc[key].push(subscription);
         return acc;
       },
       {} as Record<string, SessionSubscription[]>,
@@ -123,10 +124,11 @@ export class SubscriptionService {
     const groupedReplications = replicatons.reduce(
       (acc, rep) => {
         const exchange = this.constants.chains[rep.network].exchange;
-        if (!acc[exchange]) {
-          acc[exchange] = [];
+        const key = `${exchange} (${rep.network})`;
+        if (!acc[key]) {
+          acc[key] = [];
         }
-        acc[exchange].push(rep);
+        acc[key].push(rep);
         return acc;
       },
       {} as Record<string, SessionReplication[]>,

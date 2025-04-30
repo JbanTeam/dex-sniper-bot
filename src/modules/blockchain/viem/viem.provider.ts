@@ -50,7 +50,7 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     private readonly viemHelper: ViemHelperProvider,
     private readonly constants: ConstantsProvider,
   ) {}
-
+  // TODO: abstract class
   async onModuleInit() {
     this.clients = this.viemHelper.getClients();
     if (this.constants.notProd) await this.viemHelper.initAnvil();

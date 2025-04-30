@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Injectable } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
+import { tgCommands } from '@src/utils/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -100,23 +101,9 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   }
 
   private async setCommands(): Promise<void> {
-    const commands = [
-      { command: 'start', description: ' Приветствие, функциональность' },
-      { command: 'help', description: 'Помощь' },
-      { command: 'addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
-      { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
-      { command: 'mytokens', description: 'Посмотреть мои токены' },
-      { command: 'follow', description: 'Подписаться на кошелек, /follow [адрес_кошелька]' },
-      { command: 'unfollow', description: 'Отписаться от кошелька, /unfollow [адрес_кошелька]' },
-      { command: 'subscriptions', description: 'Посмотреть мои подписки' },
-      { command: 'replicate', description: 'Установить какие сделки повторять, /replicate [buy/sell] [лимит суммы]' },
-      { command: 'balance', description: 'Посмотреть баланс' },
-      { command: 'send', description: 'Отправить токены, /send [адрес токена] [сумма] [адрес получателя]' },
-    ];
-
     const url = `${this.TG_URL}/setMyCommands`;
     const body = {
-      commands,
+      commands: tgCommands,
       scope: { type: 'all_private_chats' },
       language_code: 'ru',
     };

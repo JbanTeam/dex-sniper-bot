@@ -133,8 +133,7 @@ export class ViemHelperProvider implements OnModuleInit {
       args: [amountIn, path],
     });
 
-    // TODO: how it works
-    const minAmountOut = (expectedAmountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+    const minAmountOut = (expectedAmountOut * BigInt(10000 - slippageBps)) / 10000n;
 
     let fn: ErcSwapFnType;
 

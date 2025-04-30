@@ -27,6 +27,29 @@ export const helpMessage = `
 /subscriptions - Посмотреть мои подписки
 `;
 
+export const tgCommands = [
+  { command: 'start', description: ' Приветствие, функциональность' },
+  { command: 'help', description: 'Помощь' },
+  { command: 'wallets', description: 'Посмотреть адреса кошельков' },
+  { command: 'tokens', description: 'Посмотреть мои токены' },
+  { command: 'subscriptions', description: 'Посмотреть мои подписки' },
+  { command: 'replications', description: 'Посмотреть настройки дублирования сделок' },
+  { command: 'balance', description: 'Посмотреть баланс' },
+];
+
+// { command: 'start', description: ' Приветствие, функциональность' },
+//       { command: 'help', description: 'Помощь' },
+//       { command: 'addtoken', description: 'Добавить токен, /addtoken [адрес_токена]' },
+//       { command: 'removetoken', description: 'Удалить токены, /removetoken [адрес_токена] - удалить токен' },
+//       { command: 'mytokens', description: 'Посмотреть мои токены' },
+//       { command: 'follow', description: 'Подписаться на кошелек, /follow [адрес_кошелька]' },
+//       { command: 'unfollow', description: 'Отписаться от кошелька, /unfollow [адрес_кошелька]' },
+//       { command: 'subscriptions', description: 'Посмотреть мои подписки' },
+//       { command: 'replicate', description: 'Установить какие сделки повторять, /replicate [buy/sell] [лимит суммы]' },
+//       { command: 'balance', description: 'Посмотреть баланс' },
+//       { command: 'send', description: 'Отправить токены, /send [адрес токена] [сумма] [адрес получателя]' },
+//       { command: 'send', description: 'Отправить токены, /send [адрес токена] [сумма] [адрес получателя]' },
+
 export const parsedFactoryAbi = parseAbi([
   'function allPairs(uint256) view returns (address)',
   'function allPairsLength() view returns (uint256)',

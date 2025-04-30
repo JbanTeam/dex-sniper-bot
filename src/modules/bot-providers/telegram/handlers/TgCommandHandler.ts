@@ -36,8 +36,10 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         return this.addToken(message);
       case command.startsWith('/removetoken'):
         return this.removeToken(message);
-      case command.startsWith('/mytokens'):
+      case command.startsWith('/tokens'):
         return this.getTokens(message);
+      case command.startsWith('/wallets'):
+        return this.getWallets(message);
       case command.startsWith('/balance'):
         return this.getBalance(message);
       case command.startsWith('/follow'):
@@ -67,7 +69,6 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
     try {
       const userExists = await this.redisService.existsInSet('users', message.chatId.toString());
-
       if (!userExists) throw new BotError('User not found', 'Пользователь не найден', 404);
 
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
@@ -118,8 +119,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       keyboard?.push([{ text: 'Все токены', callback_data: 'rm-all' }]);
 
       return {
-        // TODO: оформление текста
-        text: `Выберите действие:\n1. Удалить <u>все</u> токены\n2. Удалить <u>все</u> токены в выбранной сети`,
+        text: `Выберите действие:\n1. Удалить все токены\n2. Удалить все токены в выбранной сети`,
         options: {
           parse_mode: 'html',
           reply_markup: { inline_keyboard: keyboard },
@@ -137,6 +137,16 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
       return this.handleError(error, 'Error while getting tokens', 'Ошибка при получении токенов');
+    }
+  };
+
+  getWallets: TgCommandFunction = async message => {
+    try {
+      const reply = await this.userService.getWallets(message.chatId);
+
+      return { text: reply, options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while getting wallets', 'Ошибка при получении кошельков');
     }
   };
 
@@ -178,12 +188,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         walletAddress,
       });
 
-      return {
-        text: 'Вы успешно отписались от кошелька ✅',
-        options: {
-          parse_mode: 'html',
-        },
-      };
+      return { text: 'Вы успешно отписались от кошелька ✅', options: { parse_mode: 'html' } };
     } catch (error) {
       return this.handleError(error, 'Error while unsubscribing from address', 'Ошибка при отписке от кошелька');
     }

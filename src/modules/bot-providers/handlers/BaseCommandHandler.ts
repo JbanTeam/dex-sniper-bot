@@ -9,6 +9,7 @@ export abstract class BaseCommandHandler<TInput, TOutput> {
   abstract addToken(message: TInput): Promise<TOutput>;
   abstract removeToken(message: TInput): Promise<TOutput>;
   abstract getTokens(message: TInput): Promise<TOutput>;
+  abstract getWallets(message: TInput): Promise<TOutput>;
   abstract subscribe(message: TInput): Promise<TOutput>;
   abstract unsubscribe(message: TInput): Promise<TOutput>;
   abstract getSubscriptions(message: TInput): Promise<TOutput>;
