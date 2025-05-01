@@ -18,6 +18,12 @@ import {
   DeleteTokensParams,
   FilterTokensParams,
   CleanTokenSetsParams,
+  AddPairParams,
+  AddTokenToSetParams,
+  GetPairParams,
+  PairType,
+  TxContextType,
+  FilterTokensReturnType,
 } from './types';
 import { BotError } from '@src/errors/BotError';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -38,7 +44,7 @@ export class RedisService {
     });
   }
 
-  async addUser(userData: SessionUser) {
+  async addUser(userData: SessionUser): Promise<void> {
     const { chatId } = userData;
     const userDataArr = Object.entries(userData);
 
@@ -55,7 +61,7 @@ export class RedisService {
     await this.redisClient.sadd('users', chatId);
   }
 
-  async addToken({ chatId, token, tokens, prefix }: AddTokenParams) {
+  async addToken({ chatId, token, tokens, prefix }: AddTokenParams): Promise<void> {
     const exists = await this.existsInSet(`${prefix}s:${token.network}`, token.address);
 
     const pipe = this.redisClient.pipeline();
@@ -68,19 +74,7 @@ export class RedisService {
     await pipe.exec();
   }
 
-  async addPair({
-    network,
-    pairAddress,
-    token0,
-    token1,
-    prefix,
-  }: {
-    network: Network;
-    pairAddress: Address;
-    token0: Address;
-    token1: Address;
-    prefix: string;
-  }) {
+  async addPair({ network, pairAddress, token0, token1, prefix }: AddPairParams): Promise<void> {
     const pipe = this.redisClient.pipeline();
 
     pipe.hset(`${prefix}:${network}`, pairAddress.toLowerCase(), `${token0.toLowerCase()}:${token1.toLowerCase()}`);
@@ -89,7 +83,7 @@ export class RedisService {
     await pipe.exec();
   }
 
-  async removeToken({ userSession, deleteConditions }: RemoveTokenParams) {
+  async removeToken({ userSession, deleteConditions }: RemoveTokenParams): Promise<void> {
     const { chatId } = userSession;
 
     const { remainingTokens, replications, deletedTokens, deletedTestTokens } = this.filterTokens({
@@ -119,7 +113,7 @@ export class RedisService {
     }
   }
 
-  async addSubscription({ chatId, subscription, subscriptions }: SubscriptionParams) {
+  async addSubscription({ chatId, subscription, subscriptions }: SubscriptionParams): Promise<void> {
     const pipe = this.redisClient.pipeline();
     pipe.hset(`user:${chatId}`, 'subscriptions', JSON.stringify(subscriptions));
     pipe.sadd(`subscriptions:${subscription.network}`, subscription.address);
@@ -128,7 +122,7 @@ export class RedisService {
     await pipe.exec();
   }
 
-  async removeSubscription({ chatId, subscriptions, subscription, replications }: SubscriptionParams) {
+  async removeSubscription({ chatId, subscriptions, subscription, replications }: SubscriptionParams): Promise<void> {
     const curSubscriptions = subscriptions.filter(sub => sub.id !== subscription.id);
 
     const pipe = this.redisClient.pipeline();
@@ -152,27 +146,23 @@ export class RedisService {
     await pipe.exec();
   }
 
-  async setUserField(chatId: number, key: string, value: string) {
+  async setUserField(chatId: number, key: string, value: string): Promise<void> {
     await this.redisClient.hset(`user:${chatId}`, key, value);
   }
 
-  async setUserFields(chatId: number, fields: object) {
+  async setUserFields(chatId: number, fields: object): Promise<void> {
     await this.redisClient.hmset(`user:${chatId}`, fields);
   }
 
-  async addSubscriptionToSet(subscriptionAddress: Address) {
+  async addSubscriptionToSet(subscriptionAddress: Address): Promise<void> {
     await this.redisClient.sadd('subscriptions', subscriptionAddress);
   }
 
-  async addTokenToSet({ tokenAddress, network }: { tokenAddress: Address; network: Network }) {
-    await this.redisClient.sadd(`tokens:${network}`, tokenAddress);
+  async addTokenToSet({ tokenAddress, network, prefix }: AddTokenToSetParams): Promise<void> {
+    await this.redisClient.sadd(`${prefix}:${network}`, tokenAddress);
   }
 
-  async addTestTokenToSet({ tokenAddress, network }: { tokenAddress: Address; network: Network }) {
-    await this.redisClient.sadd(`testTokens:${network}`, tokenAddress);
-  }
-
-  async existsInSet(setName: string, value: string) {
+  async existsInSet(setName: string, value: string): Promise<number> {
     return await this.redisClient.sismember(setName, value);
   }
 
@@ -181,51 +171,51 @@ export class RedisService {
     return count === 0;
   }
 
-  async getUser(chatId: number) {
+  async getUser(chatId: number): Promise<SessionUser> {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
     if (!userData) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     return this.parseData<SessionUser>(userData);
   }
 
-  async getHashFeilds(key: string) {
+  async getHashFeilds(key: string): Promise<Record<string, string>> {
     return await this.redisClient.hgetall(key);
   }
 
-  async setHashFeilds(key: string, fields: object, expire?: number) {
+  async setHashFeilds(key: string, fields: object, expire?: number): Promise<void> {
     await this.redisClient.hmset(key, fields);
     if (expire) await this.redisClient.expire(`${key}`, expire);
   }
 
-  async getUserId(chatId: number) {
+  async getUserId(chatId: number): Promise<number | null> {
     const userData = await this.redisClient.hget(`user:${chatId}`, 'userId');
     if (!userData) return null;
 
     return Number(userData);
   }
-  async getUserChatId(chatId: number) {
+  async getUserChatId(chatId: number): Promise<number | null> {
     const userData = await this.redisClient.hget(`user:${chatId}`, 'chatId');
     if (!userData) return null;
 
     return Number(userData);
   }
 
-  async getTempToken(chatId: number) {
+  async getTempToken(chatId: number): Promise<string | null> {
     return await this.redisClient.hget(`user:${chatId}`, 'tempToken');
   }
 
-  async getTempWallet(chatId: number) {
+  async getTempWallet(chatId: number): Promise<string | null> {
     return await this.redisClient.hget(`user:${chatId}`, 'tempWallet');
   }
 
-  async getTempReplication(chatId: number) {
+  async getTempReplication(chatId: number): Promise<TempReplication> {
     const tempReplicationData = await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
     if (!tempReplicationData)
       throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', 404);
     return this.parseData<TempReplication>(JSON.parse(tempReplicationData));
   }
 
-  async getTempSendTokens(chatId: number) {
+  async getTempSendTokens(chatId: number): Promise<string | null> {
     return await this.redisClient.hget(`user:${chatId}`, 'tempSendTokens');
   }
 
@@ -247,7 +237,7 @@ export class RedisService {
     return this.parseData<SessionUserToken>(data);
   }
 
-  async getPair(prefix: string, pairAddress: Address, network: Network) {
+  async getPair({ pairAddress, network, prefix }: GetPairParams): Promise<PairType | null> {
     const pair = await this.redisClient.hget(`${prefix}:${network}`, pairAddress.toLowerCase());
     if (!pair) return null;
     const [token0, token1] = pair.split(':');
@@ -257,10 +247,10 @@ export class RedisService {
     return { token0, token1 };
   }
 
-  async getTxContext(key: string) {
+  async getTxContext(key: string): Promise<TxContextType | null> {
     const context = await this.redisClient.hgetall(key);
     if (!context) return null;
-    return this.parseData<{ replicationDepth: number; initiators: number[] }>(context);
+    return this.parseData<TxContextType>(context);
   }
 
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {
@@ -281,7 +271,7 @@ export class RedisService {
     return this.parseData<CachedContractsType>(data);
   }
 
-  async getAllUsers() {
+  async getAllUsers(): Promise<SessionUser[]> {
     const usersIds = await this.redisClient.smembers('users');
 
     const users: SessionUser[] = await Promise.all(
@@ -294,21 +284,21 @@ export class RedisService {
     return users;
   }
 
-  async getUsersSet() {
+  async getUsersSet(): Promise<string[]> {
     const usersIds = await this.redisClient.smembers('users');
     return usersIds;
   }
-  async getTokensSet(network: Network, prefix: string) {
+  async getTokensSet(network: Network, prefix: string): Promise<string[]> {
     const tokens = await this.redisClient.smembers(`${prefix}:${network}`);
     return tokens;
   }
 
-  async getPairsSet(network: Network, prefix: string) {
+  async getPairsSet(network: Network, prefix: string): Promise<string[]> {
     const pairs = await this.redisClient.smembers(`${prefix}:${network}`);
     return pairs;
   }
 
-  async getSubscriptionsSet(network: Network) {
+  async getSubscriptionsSet(network: Network): Promise<string[]> {
     return await this.redisClient.smembers(`subscriptions:${network}`);
   }
 
@@ -333,7 +323,7 @@ export class RedisService {
     return null;
   }
 
-  private filterTokens({ userSession, deleteConditions }: FilterTokensParams) {
+  private filterTokens({ userSession, deleteConditions }: FilterTokensParams): FilterTokensReturnType {
     const { address, network } = deleteConditions;
     const deletedTokens: SessionUserToken[] = [];
     const deletedTestTokens: SessionUserToken[] = [];
@@ -369,7 +359,7 @@ export class RedisService {
     };
   }
 
-  private deleteTokens({ pipe, chatId, tokens, deletedTokens, prefix }: DeleteTokensParams) {
+  private deleteTokens({ pipe, chatId, tokens, deletedTokens, prefix }: DeleteTokensParams): void {
     pipe.hset(`user:${chatId}`, `${prefix}s`, JSON.stringify(tokens || []));
 
     for (const token of deletedTokens) {
@@ -377,7 +367,7 @@ export class RedisService {
     }
   }
 
-  private async cleanTokenSets({ deletedTokens, prefix }: CleanTokenSetsParams) {
+  private async cleanTokenSets({ deletedTokens, prefix }: CleanTokenSetsParams): Promise<void> {
     const pipe = this.redisClient.pipeline();
 
     for (const token of deletedTokens) {

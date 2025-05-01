@@ -14,6 +14,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { Network, SessionUserToken } from '@src/types/types';
 import {
   AddTokenParams,
+  CreateAndSaveTokenReturnType,
   CreateTestTokenParams,
   CreateTokenEntityParams,
   DeleteConditions,
@@ -34,7 +35,7 @@ export class UserService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async getOrCreateUser({ chatId }: { chatId: number }): Promise<{ action: string; user: User | null }> {
+  async getOrCreateUser(chatId: number): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
     let user = await this.findById({ chatId });
 
@@ -195,7 +196,7 @@ export class UserService {
     return user;
   }
 
-  private validateTokenAddition({ userSession, address, network }: AddTokenParams) {
+  private validateTokenAddition({ userSession, address, network }: AddTokenParams): void {
     if (userSession.tokens.some(t => t.address === address && t.network === network)) {
       throw new BotError('Token already added', 'Токен уже добавлен', 400);
     }
@@ -209,7 +210,11 @@ export class UserService {
     }
   }
 
-  private async createAndSaveToken({ userSession, address, network }: AddTokenParams) {
+  private async createAndSaveToken({
+    userSession,
+    address,
+    network,
+  }: AddTokenParams): Promise<CreateAndSaveTokenReturnType> {
     const { name, symbol, decimals, existsTokenId, pairAddresses } = await this.getTokenData({
       address,
       network,
@@ -239,7 +244,7 @@ export class UserService {
     return { ...tokenData, existsTokenId: '' };
   }
 
-  private createTokenEntity(tokenEntityParams: CreateTokenEntityParams) {
+  private createTokenEntity(tokenEntityParams: CreateTokenEntityParams): UserToken {
     const { userSession, ...createParams } = tokenEntityParams;
     return this.userTokenRepository.create({
       ...createParams,
@@ -253,13 +258,13 @@ export class UserService {
     return sessionToken;
   }
 
-  private async updateTokenStorage({ chatId, tokens, token, isTest = false }: UpdateTokenStorageParams) {
+  private async updateTokenStorage({ chatId, tokens, token, isTest = false }: UpdateTokenStorageParams): Promise<void> {
     const prefix = isTest ? 'testToken' : 'token';
 
     await this.redisService.addToken({ chatId, token, tokens, prefix });
   }
 
-  private async createTestToken({ userSession, sessionToken, existsTokenId }: CreateTestTokenParams) {
+  private async createTestToken({ userSession, sessionToken, existsTokenId }: CreateTestTokenParams): Promise<void> {
     let testToken = existsTokenId ? await this.redisService.findTestTokenById(existsTokenId) : null;
 
     if (!testToken) {

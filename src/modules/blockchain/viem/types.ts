@@ -1,8 +1,9 @@
-import { Account, PublicClient, WalletClient } from 'viem';
+import { Account, Chain, PublicClient, WalletClient } from 'viem';
 
-import { Transaction } from '../types';
+import { PairAddresses, Transaction } from '../types';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { Address, Network, SessionReplication, SessionUserToken, ViemNetwork } from '@src/types/types';
+import { Subscription } from '@modules/subscription/subscription.entity';
 
 type ViemClientsType = {
   public: {
@@ -13,18 +14,18 @@ type ViemClientsType = {
   };
 };
 
-type DeployTestContractParams = {
-  token: SessionUserToken;
-  count?: string;
-  walletAddress: Address;
-};
-
-type DeployContractParams = {
+type CreateTokenParams = {
   name: string;
   symbol: string;
   decimals: number;
   count: string;
   network: Network;
+};
+
+type CreateTokenReturnType = {
+  exchangeAddress: Address;
+  tokenAddress: Address;
+  pairAddresses: PairAddresses;
 };
 
 type TransferParams = {
@@ -68,6 +69,13 @@ type AllowanceParams = {
   network: Network;
 };
 
+type BalanceAllowanceReturnType = {
+  currencyIn: string;
+  currencyOut: string;
+  inDecimals: number;
+  outDecimals: number;
+};
+
 type BalanceOfParams = {
   tokenAddress: Address;
   walletAddress: Address;
@@ -89,13 +97,74 @@ type SwapParams = {
   walletClient: WalletClient;
 };
 
+type SwapReturnType = { amountOut: bigint; amountIn: bigint };
+
 type CachedContractsType = {
   nativeToken: Address;
   factoryAddress: Address;
   routerAddress: Address;
 };
 
+type ReplicateTransactionParams = {
+  subscription: Subscription;
+  tx: Transaction;
+};
+
+type InitSwapArgsParams = {
+  tx: Transaction;
+  walletAddress: Address;
+  slippageBps?: number;
+};
+
+type InitSwapArgsReturnType = { fn: ErcSwapFnType; args: any[]; value: bigint | undefined };
+
+type SharedVarsReturnType = { chain: Chain; rpcUrl: string; nativeToken: Address; routerAddress: Address };
+
+type MatchedReplicationParams = {
+  tx: Transaction;
+  replications: SessionReplication[];
+  subscriptionAddress: Address;
+};
+
+type GetPairParams = {
+  tokenAddress: Address;
+  nativeToken: Address;
+  factoryAddress: Address;
+  publicClient: PublicClient;
+};
+
+type DeployTokenParams = {
+  exchangeAddress: Address;
+  name: string;
+  symbol: string;
+  decimals: number;
+  count: string;
+};
+
+type AnvilSwapParams = {
+  recipientAddress: Address;
+  value: bigint;
+  deadline: bigint;
+  path: Address[];
+  fn: ErcSwapFnType;
+};
+
+type AddLiquidityParams = { exchangeAddress: Address; tokenAddress: Address; network: Network; decimals: number };
+
+type CreateTestTokenParams = {
+  token: SessionUserToken;
+  count?: string;
+  walletAddress: Address;
+};
+
+type CreateTestTokenReturnType = {
+  token: SessionUserToken;
+  pairAddresses: PairAddresses;
+};
+
 type ErcSwapFnType = 'swapExactETHForTokens' | 'swapExactTokensForETH' | 'swapExactTokensForTokens';
+
+type UnwatchCallback = { [key in ViemNetwork]: () => void };
 
 type SwapLog = {
   eventName: 'Swap';
@@ -121,18 +190,32 @@ type SwapLog = {
 
 export {
   ViemClientsType,
-  DeployTestContractParams,
-  DeployContractParams,
+  CreateTokenParams,
+  CreateTokenReturnType,
   TestBalanceParams,
   TransferParams,
   TransferNativeParams,
   BalanceAllowanceParams,
+  BalanceAllowanceReturnType,
   AllowanceParams,
   BalanceOfParams,
   ApproveParams,
   SwapParams,
+  SwapReturnType,
   SendTestTokenParams,
   CachedContractsType,
+  ReplicateTransactionParams,
+  InitSwapArgsParams,
+  InitSwapArgsReturnType,
+  SharedVarsReturnType,
+  MatchedReplicationParams,
+  GetPairParams,
+  DeployTokenParams,
+  AnvilSwapParams,
+  AddLiquidityParams,
+  CreateTestTokenParams,
+  CreateTestTokenReturnType,
   ErcSwapFnType,
+  UnwatchCallback,
   SwapLog,
 };

@@ -1,3 +1,4 @@
+import { OnEvent } from '@nestjs/event-emitter';
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
@@ -13,7 +14,6 @@ import {
   http,
 } from 'viem';
 
-import { Subscription } from '@modules/subscription/subscription.entity';
 import { BotError } from '@src/errors/BotError';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { ViemHelperProvider } from './viem-helper.provider';
@@ -21,10 +21,16 @@ import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { parsedPairAbi } from '@src/utils/constants';
-import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
 import { encryptPrivateKey } from '@src/utils/crypto';
+import { BaseNetworkProvider } from '../BaseNetworkProvider';
+import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
 import { Network, ViemNetwork } from '@src/types/types';
-import { BalanceAllowanceParams, ViemClientsType } from './types';
+import {
+  BalanceAllowanceParams,
+  BalanceAllowanceReturnType,
+  ReplicateTransactionParams,
+  ViemClientsType,
+} from './types';
 import {
   BalanceInfo,
   CheckTokenParams,
@@ -37,8 +43,6 @@ import {
   TokenBalanceReturnType,
   Transaction,
 } from '../types';
-import { OnEvent } from '@nestjs/event-emitter';
-import { BaseNetworkProvider } from '../BaseNetworkProvider';
 
 @Injectable()
 export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, OnModuleDestroy {
@@ -107,7 +111,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         publicClient.readContract({ address, abi: erc20Abi, functionName: 'name' }),
         publicClient.readContract({ address, abi: erc20Abi, functionName: 'symbol' }),
         publicClient.readContract({ address, abi: erc20Abi, functionName: 'decimals' }),
-        this.viemHelper.getPair(address, nativeToken, factoryAddress, publicClient),
+        this.viemHelper.getPair({ tokenAddress: address, nativeToken, factoryAddress, publicClient }),
       ]);
 
       return { name, symbol, decimals, pairAddresses };
@@ -170,16 +174,12 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
   @OnEvent('monitorDex')
   async monitorDex({ network }: { network: Network }): Promise<void> {
-    console.log(`${network} enter monitorDex`);
-
     this.unwatchCallbacks[network]();
     const client = this.clients.publicWebsocket[network];
 
     const prefix = this.constants.notProd ? 'testPairs' : 'pairs';
     const pairs = await this.redisService.getPairsSet(network, prefix);
     isEtherAddressArr(pairs);
-    // TODO: remove consolelogs
-    console.log('✅ Pairs:', pairs);
 
     this.unwatchCallbacks[network] = client.watchEvent({
       address: pairs,
@@ -194,7 +194,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
           for (const log of parsedLogs) {
             const tx = await this.viemHelper.parseEventLog(log, network);
-            console.log(tx);
             if (!tx) continue;
 
             const context = await this.redisService.getTxContext(`txContext:${tx.hash}`);
@@ -220,11 +219,11 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     });
   }
 
-  stopMonitoring() {
+  stopMonitoring(): void {
     Object.values(this.unwatchCallbacks).forEach(unwatch => unwatch());
   }
 
-  async sendTokens({ userSession, wallet, token, amount, recipientAddress }: SendTokensParams) {
+  async sendTokens({ userSession, wallet, token, amount, recipientAddress }: SendTokensParams): Promise<void> {
     let tokenAddress = token.address;
     const { network } = wallet;
     const publicClient = this.clients.public[network];
@@ -270,7 +269,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     }
   }
 
-  async sendNative({ wallet, amount, recipientAddress }: SendNativeParams) {
+  async sendNative({ wallet, amount, recipientAddress }: SendNativeParams): Promise<void> {
     const { network } = wallet;
     const publicClient = this.clients.public[network];
     const decimals = this.constants.chains[network].tokenDecimals;
@@ -320,7 +319,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     };
   }
 
-  private async handleTransaction({ tx }: { tx: Transaction }) {
+  private async handleTransaction({ tx }: { tx: Transaction }): Promise<void> {
     const subscriptions = await this.subscriptionService.findSubscriptionsByAddress(tx.to);
 
     if (!subscriptions?.length) return;
@@ -349,7 +348,12 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     }
   }
 
-  private async checkBalanceAndAllowance({ replication, account, tx, walletClient }: BalanceAllowanceParams) {
+  private async checkBalanceAndAllowance({
+    replication,
+    account,
+    tx,
+    walletClient,
+  }: BalanceAllowanceParams): Promise<BalanceAllowanceReturnType> {
     const { network, routerAddress, amountIn, tokenIn } = tx;
     const { nativeToken } = this.viemHelper.getSharedVars(network);
     const walletAddress = account.address;
@@ -408,7 +412,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     return { currencyIn, currencyOut, inDecimals, outDecimals };
   }
 
-  private async replicateTransaction({ subscription, tx }: { subscription: Subscription; tx: Transaction }) {
+  private async replicateTransaction({ subscription, tx }: ReplicateTransactionParams): Promise<void> {
     const { chatId } = subscription.user;
     const { network } = tx;
     const userSession = await this.redisService.getUser(chatId);

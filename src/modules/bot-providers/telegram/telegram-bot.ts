@@ -31,7 +31,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     this.TG_URL += token;
   }
 
-  async start() {
+  async start(): Promise<void> {
     await this.setCommands();
     await this.onMessage();
   }
@@ -91,7 +91,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   }
 
   @OnEvent('notifyUser')
-  async notifyUser({ chatId, text }: { chatId: number; text: string }) {
+  async notifyUser({ chatId, text }: { chatId: number; text: string }): Promise<void> {
     try {
       await this.sendMessage({ chatId, text });
     } catch (error) {
@@ -122,7 +122,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  private async handleIncomingMessage(message: IncomingMessage | IncomingQuery) {
+  private async handleIncomingMessage(message: IncomingMessage | IncomingQuery): Promise<void> {
     const response = await this.routeMessage(message);
     if ('data' in message) {
       await this.deleteMessage({ chatId: message.chatId, messageId: message.messageId });
@@ -152,9 +152,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         return;
       }
 
-      const { user, action } = await this.userService.getOrCreateUser({
-        chatId,
-      });
+      const { user, action } = await this.userService.getOrCreateUser(chatId);
 
       if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
 

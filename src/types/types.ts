@@ -3,6 +3,7 @@ import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
+import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';
 
 export interface BotProviderInterface<SendMsgParams = any, DeleteMsgParams = any> {
   start(): Promise<void>;
@@ -43,10 +44,16 @@ export const Network = {
   ...SolanaNetwork,
 } as const;
 
-export type Network = (typeof Network)[keyof typeof Network];
-export type ViemNetwork = (typeof ViemNetwork)[keyof typeof ViemNetwork];
+export type Network = keyof typeof Network;
+export type ViemNetwork = keyof typeof ViemNetwork;
+// export type SolanaNetwork = keyof typeof SolanaNetwork;
 
-export type NetworkProviders = Record<Network, ViemProvider>;
+export type NetworkProviders = {
+  [K in Network]: K extends ViemNetwork ? ViemProvider : never;
+};
+export type TestNetworkProviders = {
+  [K in Network]: K extends ViemNetwork ? AnvilProvider : never;
+};
 
 export type ViemChainConfig = {
   name: string;

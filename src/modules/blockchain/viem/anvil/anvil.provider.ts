@@ -29,13 +29,16 @@ import { Network, SessionUserToken, Address, ViemNetwork } from '@src/types/type
 import {
   TestBalanceParams,
   SendTestTokenParams,
-  DeployTestContractParams,
+  CreateTestTokenParams,
   ViemClientsType,
-  DeployContractParams,
+  CreateTokenParams,
   CachedContractsType,
-  ErcSwapFnType,
+  CreateTokenReturnType,
+  DeployTokenParams,
+  AnvilSwapParams,
+  AddLiquidityParams,
+  CreateTestTokenReturnType,
 } from '../types';
-import { PairAddresses } from '@modules/blockchain/types';
 
 @Injectable()
 export class AnvilProvider {
@@ -63,7 +66,7 @@ export class AnvilProvider {
     });
   }
 
-  async initTestDex() {
+  async initTestDex(): Promise<void> {
     const { exchangeAddress } = this.constants.anvilAddresses;
     this.cachedContracts = await this.redisService.getCachedContracts();
     const { nativeToken, factoryAddress, routerAddress } = this.cachedContracts;
@@ -77,7 +80,7 @@ export class AnvilProvider {
     }
   }
 
-  async initTestAddresses() {
+  async initTestAddresses(): Promise<void> {
     const [exchangeAddress, recipientAddress] = await this.walletClient.getAddresses();
     this.constants.anvilAddresses.exchangeAddress = exchangeAddress;
     this.constants.anvilAddresses.recipientAddress = recipientAddress;
@@ -104,7 +107,11 @@ export class AnvilProvider {
     );
   }
 
-  async createTestToken({ token, count = '1000000000', walletAddress }: DeployTestContractParams) {
+  async createTestToken({
+    token,
+    count = '1000000000',
+    walletAddress,
+  }: CreateTestTokenParams): Promise<CreateTestTokenReturnType> {
     const { name, symbol, decimals, network } = token;
     const { exchangeAddress, tokenAddress, pairAddresses } = await this.createToken({
       name,
@@ -126,7 +133,7 @@ export class AnvilProvider {
     };
   }
 
-  async sendFakeSwap(testToken: SessionUserToken) {
+  async sendFakeSwap(testToken: SessionUserToken): Promise<void> {
     const { recipientAddress } = this.constants.anvilAddresses;
 
     const value = parseEther('1');
@@ -149,7 +156,7 @@ export class AnvilProvider {
     });
   }
 
-  async setTestBalance({ network, address }: { network: Network; address: Address }) {
+  async setTestBalance({ network, address }: { network: Network; address: Address }): Promise<void> {
     try {
       const client = createTestClient({
         mode: 'anvil',
@@ -167,26 +174,29 @@ export class AnvilProvider {
     }
   }
 
-  private async createToken({ name, symbol, decimals, count, network }: DeployContractParams): Promise<{
-    exchangeAddress: Address;
-    tokenAddress: Address;
-    pairAddresses: PairAddresses;
-  }> {
+  private async createToken({
+    name,
+    symbol,
+    decimals,
+    count,
+    network,
+  }: CreateTokenParams): Promise<CreateTokenReturnType> {
     const { exchangeAddress } = this.constants.anvilAddresses;
 
     const tokenAddress = await this.deployToken({ exchangeAddress, name, symbol, decimals, count });
     await this.depositWbnb(exchangeAddress);
     await this.approve(exchangeAddress, tokenAddress);
-    await this.addLiquidity(exchangeAddress, tokenAddress, network, decimals);
+    await this.addLiquidity({ exchangeAddress, tokenAddress, network, decimals });
 
     const nativeToken = this.cachedContracts.nativeToken;
     const factoryAddress = this.cachedContracts.factoryAddress;
-    const pairAddresses = await this.viemHelper.getPair(tokenAddress, nativeToken, factoryAddress, this.publicClient);
+    const publicClient = this.publicClient;
+    const pairAddresses = await this.viemHelper.getPair({ tokenAddress, nativeToken, factoryAddress, publicClient });
 
     return { exchangeAddress, tokenAddress, pairAddresses };
   }
 
-  private async getBalance({ tokenAddress, walletAddress, decimals, name }: TestBalanceParams) {
+  private async getBalance({ tokenAddress, walletAddress, decimals, name }: TestBalanceParams): Promise<void> {
     const nativeBalance = await this.publicClient.getBalance({ address: walletAddress });
 
     const balance = await this.viemHelper.balanceOf({ tokenAddress, walletAddress, publicClient: this.publicClient });
@@ -198,7 +208,7 @@ export class AnvilProvider {
     console.log(`💰 Баланс ${name}:`, formattedBalance);
   }
 
-  private async sendTestTokens({ tokenAddress, sender, walletAddress, decimals }: SendTestTokenParams) {
+  private async sendTestTokens({ tokenAddress, sender, walletAddress, decimals }: SendTestTokenParams): Promise<void> {
     const amount = parseUnits('1000000.0', decimals);
 
     const hash = await this.walletClient.writeContract({
@@ -221,7 +231,7 @@ export class AnvilProvider {
     console.log('✅ Токены отправлены', receipt);
   }
 
-  private async deployWbnb(exchangeAddress: Address) {
+  private async deployWbnb(exchangeAddress: Address): Promise<void> {
     console.log('Deploying WBNB...');
     const hash = await this.walletClient.deployContract({
       abi: wbnbAbi,
@@ -238,19 +248,7 @@ export class AnvilProvider {
     await this.depositWbnb(exchangeAddress);
   }
 
-  private async deployToken({
-    exchangeAddress,
-    name,
-    symbol,
-    decimals,
-    count,
-  }: {
-    exchangeAddress: Address;
-    name: string;
-    symbol: string;
-    decimals: number;
-    count: string;
-  }) {
+  private async deployToken({ exchangeAddress, name, symbol, decimals, count }: DeployTokenParams): Promise<Address> {
     console.log(`Deploying ${name}...`);
     const txHash = await this.walletClient.deployContract({
       abi: coinAbi,
@@ -274,9 +272,9 @@ export class AnvilProvider {
     return tokenAddress;
   }
 
-  private depositWbnb(exchangeAddress: Address) {
+  private async depositWbnb(exchangeAddress: Address): Promise<void> {
     console.log('Depositing WBNB...');
-    return this.walletClient.writeContract({
+    await this.walletClient.writeContract({
       address: this.cachedContracts.nativeToken,
       abi: wbnbAbi,
       functionName: 'deposit',
@@ -287,7 +285,7 @@ export class AnvilProvider {
     });
   }
 
-  private async deployFactory(exchangeAddress: Address) {
+  private async deployFactory(exchangeAddress: Address): Promise<void> {
     console.log('Deploying Factory...');
     const hash = await this.walletClient.deployContract({
       abi: factoryAbi,
@@ -303,7 +301,7 @@ export class AnvilProvider {
     this.cachedContracts.factoryAddress = receipt.contractAddress.toLowerCase() as Address;
   }
 
-  private async deployRouter(exchangeAddress: Address) {
+  private async deployRouter(exchangeAddress: Address): Promise<void> {
     console.log('Deploying Router...');
     const hash = await this.walletClient.deployContract({
       abi: routerAbi,
@@ -329,7 +327,7 @@ export class AnvilProvider {
     });
   }
 
-  private async approve(exchangeAddress: Address, tokenAddress: Address) {
+  private async approve(exchangeAddress: Address, tokenAddress: Address): Promise<void> {
     console.log('Approving Router for token...');
     await this.walletClient.writeContract({
       address: tokenAddress,
@@ -341,19 +339,7 @@ export class AnvilProvider {
     });
   }
 
-  private async swap({
-    recipientAddress,
-    value,
-    deadline,
-    path,
-    fn,
-  }: {
-    recipientAddress: Address;
-    value: bigint;
-    deadline: bigint;
-    path: Address[];
-    fn: ErcSwapFnType;
-  }) {
+  private async swap({ recipientAddress, value, deadline, path, fn }: AnvilSwapParams): Promise<void> {
     const hash = await this.walletClient.writeContract({
       address: this.cachedContracts.routerAddress,
       abi: routerAbi,
@@ -371,7 +357,7 @@ export class AnvilProvider {
     console.log('#️⃣ Swap tx hash:', hash);
   }
 
-  private async addLiquidity(exchangeAddress: Address, tokenAddress: Address, network: Network, decimals: number) {
+  private async addLiquidity({ exchangeAddress, tokenAddress, network, decimals }: AddLiquidityParams): Promise<void> {
     console.log('Adding liquidity...');
     const nativeToken = this.cachedContracts.nativeToken;
     const nativeDecimals = this.constants.chains[network].tokenDecimals;

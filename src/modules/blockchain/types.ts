@@ -51,7 +51,7 @@ type SendTokensParams = {
 
 type SendNativeParams = Omit<SendTokensParams, 'token'>;
 
-type DeployTestContractParams = { wallet: SessionWallet; token: SessionUserToken };
+type DeployTokenParams = { wallet: SessionWallet; token: SessionUserToken };
 
 type Transaction = {
   eventName: string;
@@ -108,7 +108,7 @@ export {
   TokenBalanceReturnType,
   SendTokensParams,
   SendNativeParams,
-  DeployTestContractParams,
+  DeployTokenParams,
   Transaction,
   BalanceInfo,
   PairAddresses,

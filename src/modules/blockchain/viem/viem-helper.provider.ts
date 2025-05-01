@@ -12,7 +12,6 @@ import {
   http,
   Log,
   parseEventLogs,
-  PublicClient,
   WalletClient,
   webSocket,
 } from 'viem';
@@ -39,6 +38,13 @@ import {
   SwapParams,
   ViemClientsType,
   TransferNativeParams,
+  UnwatchCallback,
+  InitSwapArgsParams,
+  InitSwapArgsReturnType,
+  SharedVarsReturnType,
+  MatchedReplicationParams,
+  SwapReturnType,
+  GetPairParams,
 } from './types';
 
 @Injectable()
@@ -94,8 +100,8 @@ export class ViemHelperProvider implements OnModuleInit {
     return this.clients;
   }
 
-  initUnwatchCallbacks() {
-    const unwatchCallbacks = {} as { [key in ViemNetwork]: () => void };
+  initUnwatchCallbacks(): UnwatchCallback {
+    const unwatchCallbacks = {} as UnwatchCallback;
     Object.keys(ViemNetwork).forEach(network => {
       unwatchCallbacks[network] = () => {};
     });
@@ -103,20 +109,12 @@ export class ViemHelperProvider implements OnModuleInit {
     return unwatchCallbacks;
   }
 
-  async initAnvil() {
+  async initAnvil(): Promise<void> {
     await this.anvilProvider.initTestAddresses();
     await this.anvilProvider.initTestDex();
   }
 
-  async initSwapArgs({
-    tx,
-    walletAddress,
-    slippageBps = 300,
-  }: {
-    tx: Transaction;
-    walletAddress: Address;
-    slippageBps?: number;
-  }) {
+  async initSwapArgs({ tx, walletAddress, slippageBps = 300 }: InitSwapArgsParams): Promise<InitSwapArgsReturnType> {
     const { tokenIn, tokenOut, amountIn } = tx;
     const { nativeToken } = this.getSharedVars(tx.network);
     const publicClient = this.clients.public[tx.network];
@@ -157,7 +155,7 @@ export class ViemHelperProvider implements OnModuleInit {
     return { fn, args, value };
   }
 
-  getSharedVars(network: Network) {
+  getSharedVars(network: Network): SharedVarsReturnType {
     const { chains, notProd, ANVIL_RPC_URL } = this.constants;
     const chain = notProd ? anvil : chains[network].chain;
     const rpcUrl = notProd ? ANVIL_RPC_URL : chains[network].rpcUrl;
@@ -187,7 +185,7 @@ export class ViemHelperProvider implements OnModuleInit {
     const { address, eventName } = log;
     const { sender, to, amount0In, amount1In, amount0Out, amount1Out } = log.args;
     const prefix = notProd ? 'testPair' : 'pair';
-    const pair = await this.redisService.getPair(prefix, address, network);
+    const pair = await this.redisService.getPair({ prefix, pairAddress: address, network });
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
 
     if (!pair) return null;
@@ -225,11 +223,7 @@ export class ViemHelperProvider implements OnModuleInit {
     tx,
     replications,
     subscriptionAddress,
-  }: {
-    tx: Transaction;
-    replications: SessionReplication[];
-    subscriptionAddress: Address;
-  }): SessionReplication | undefined {
+  }: MatchedReplicationParams): SessionReplication | undefined {
     const { tokenIn, tokenOut, amountIn, amountOut, network } = tx;
     const nativeToken = this.getSharedVars(network).nativeToken;
     const isInNative = tokenIn === nativeToken;
@@ -256,7 +250,7 @@ export class ViemHelperProvider implements OnModuleInit {
     }
   }
 
-  async transfer({ tokenAddress, wallet, recipientAddress, txAmount }: TransferParams) {
+  async transfer({ tokenAddress, wallet, recipientAddress, txAmount }: TransferParams): Promise<void> {
     const { network } = wallet;
     const publicClient = this.clients.public[network];
 
@@ -282,7 +276,7 @@ export class ViemHelperProvider implements OnModuleInit {
     console.log('✅ Токены отправлены', receipt);
   }
 
-  async transferNative({ wallet, recipientAddress, txAmount }: TransferNativeParams) {
+  async transferNative({ wallet, recipientAddress, txAmount }: TransferNativeParams): Promise<void> {
     const { network } = wallet;
     const publicClient = this.clients.public[network];
     const currency = this.constants.chains[network].tokenSymbol;
@@ -306,7 +300,7 @@ export class ViemHelperProvider implements OnModuleInit {
     console.log(`✅ ${currency} отправлены`, receipt);
   }
 
-  async balanceOf({ tokenAddress, walletAddress, publicClient }: BalanceOfParams) {
+  async balanceOf({ tokenAddress, walletAddress, publicClient }: BalanceOfParams): Promise<bigint> {
     return publicClient.readContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -315,7 +309,7 @@ export class ViemHelperProvider implements OnModuleInit {
     });
   }
 
-  async approve({ tokenAddress, walletClient, tx, account }: ApproveParams) {
+  async approve({ tokenAddress, walletClient, tx, account }: ApproveParams): Promise<void> {
     const { network, routerAddress, amountIn } = tx;
     await walletClient.writeContract({
       address: tokenAddress,
@@ -327,7 +321,7 @@ export class ViemHelperProvider implements OnModuleInit {
     });
   }
 
-  async allowance({ routerAddress, tokenAddress, walletAddress, network }: AllowanceParams) {
+  async allowance({ routerAddress, tokenAddress, walletAddress, network }: AllowanceParams): Promise<bigint> {
     const publicClient = this.clients.public[network];
     return publicClient.readContract({
       address: tokenAddress,
@@ -337,7 +331,7 @@ export class ViemHelperProvider implements OnModuleInit {
     });
   }
 
-  async swap({ walletAddress, tx, account, walletClient, chatId }: SwapParams) {
+  async swap({ walletAddress, tx, account, walletClient, chatId }: SwapParams): Promise<SwapReturnType> {
     const { chain } = this.getSharedVars(tx.network);
     const swapArgs = await this.initSwapArgs({ tx, walletAddress });
     const { fn, args, value } = swapArgs;
@@ -385,12 +379,7 @@ export class ViemHelperProvider implements OnModuleInit {
     return { amountIn, amountOut };
   }
 
-  async getPair(
-    tokenAddress: Address,
-    nativeToken: Address,
-    factoryAddress: Address,
-    publicClient: PublicClient,
-  ): Promise<PairAddresses> {
+  async getPair({ factoryAddress, nativeToken, tokenAddress, publicClient }: GetPairParams): Promise<PairAddresses> {
     const pairAddress = await publicClient.readContract({
       address: factoryAddress,
       abi: parsedFactoryAbi,
@@ -437,11 +426,11 @@ export class ViemHelperProvider implements OnModuleInit {
     );
   }
 
-  notifyUser({ chatId, text }: { chatId: number; text: string }) {
+  notifyUser({ chatId, text }: { chatId: number; text: string }): void {
     this.eventEmitter.emit('notifyUser', { chatId, text });
   }
 
-  handleError(error: unknown, errMsg: string) {
+  handleError(error: unknown, errMsg: string): void {
     this.logger.error(errMsg, error);
 
     if (error instanceof BotError) {

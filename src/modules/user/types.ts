@@ -1,18 +1,19 @@
+import { PairAddresses } from '@modules/blockchain/types';
 import { Address, Network, SessionUser, SessionUserToken } from '@src/types/types';
 
-export type AddTokenParams = {
+type AddTokenParams = {
   userSession: SessionUser;
   address: Address;
   network: Network;
 };
 
-export type RemoveTokenParams = {
+type RemoveTokenParams = {
   chatId: number;
   address?: Address;
   network?: Network;
 };
 
-export type CreateTokenEntityParams = {
+type CreateTokenEntityParams = {
   userSession: SessionUser;
   address: Address;
   network: Network;
@@ -21,21 +22,38 @@ export type CreateTokenEntityParams = {
   decimals: number;
 };
 
-export type CreateTestTokenParams = {
+type CreateAndSaveTokenReturnType = {
+  tokens: SessionUserToken[];
+  sessionToken: SessionUserToken;
+  existsTokenId: string;
+  pairAddresses: PairAddresses | null;
+};
+
+type CreateTestTokenParams = {
   userSession: SessionUser;
   sessionToken: SessionUserToken;
   existsTokenId?: string;
 };
 
-export type UpdateTokenStorageParams = {
+type UpdateTokenStorageParams = {
   chatId: number;
   tokens: SessionUserToken[];
   token: SessionUserToken;
   isTest?: boolean;
 };
 
-export type DeleteConditions = {
+type DeleteConditions = {
   user: { id: number };
   network?: Network;
   address?: Address;
+};
+
+export {
+  AddTokenParams,
+  RemoveTokenParams,
+  CreateTokenEntityParams,
+  CreateAndSaveTokenReturnType,
+  CreateTestTokenParams,
+  UpdateTokenStorageParams,
+  DeleteConditions,
 };

@@ -7,14 +7,8 @@ import { Replication } from './replication.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BotError } from '@src/errors/BotError';
-import {
-  Address,
-  Network,
-  SessionUser,
-  SessionReplication,
-  SessionSubscription,
-  TempReplication,
-} from '@src/types/types';
+import { PrepareSessionReplication, SubscribeToWalletParams, UnsubscribeFromWallwtParams } from './types';
+import { Address, SessionUser, SessionReplication, SessionSubscription, TempReplication } from '@src/types/types';
 
 @Injectable()
 export class SubscriptionService {
@@ -27,7 +21,7 @@ export class SubscriptionService {
     private readonly constants: ConstantsProvider,
   ) {}
 
-  async subscribeToWallet({ chatId, address, network }: { chatId: number; address: Address; network: Network }) {
+  async subscribeToWallet({ chatId, address, network }: SubscribeToWalletParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address === address);
@@ -56,7 +50,7 @@ export class SubscriptionService {
     });
   }
 
-  async unsubscribeFromWallet({ chatId, walletAddress }: { chatId: number; walletAddress: Address }) {
+  async unsubscribeFromWallet({ chatId, walletAddress }: UnsubscribeFromWallwtParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
     if (!userSession.subscriptions?.length) {
@@ -85,7 +79,7 @@ export class SubscriptionService {
     });
   }
 
-  async getSubscriptions(chatId: number) {
+  async getSubscriptions(chatId: number): Promise<string> {
     const subscriptions = await this.redisService.getSubscriptions(chatId);
 
     if (!subscriptions?.length) {
@@ -117,7 +111,7 @@ export class SubscriptionService {
     return reply;
   }
 
-  async getReplications(chatId: number) {
+  async getReplications(chatId: number): Promise<string> {
     const replicatons = await this.redisService.getReplications(chatId);
 
     if (!replicatons?.length) {
@@ -151,7 +145,7 @@ export class SubscriptionService {
     return reply;
   }
 
-  async createOrUpdateReplication(tempReplication: TempReplication) {
+  async createOrUpdateReplication(tempReplication: TempReplication): Promise<string> {
     const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
     if (!chatId || !subscriptionId || !tokenId) {
       throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
@@ -170,7 +164,7 @@ export class SubscriptionService {
     return await this.createReplication(tempReplication, userSession);
   }
 
-  async findById(id: number) {
+  async findById(id: number): Promise<Subscription | null> {
     return await this.subscriptionRepository.findOne({
       where: { id },
     });
@@ -196,7 +190,7 @@ export class SubscriptionService {
     });
   }
 
-  private async createReplication(tempReplication: TempReplication, userSession: SessionUser) {
+  private async createReplication(tempReplication: TempReplication, userSession: SessionUser): Promise<string> {
     const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
       throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
@@ -253,11 +247,7 @@ export class SubscriptionService {
     replication,
     tokenAddress,
     tempReplication,
-  }: {
-    replication: Replication;
-    tokenAddress: Address;
-    tempReplication: TempReplication;
-  }) {
+  }: PrepareSessionReplication): SessionReplication {
     const { subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
       throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
@@ -284,7 +274,7 @@ export class SubscriptionService {
     return sessionReplication;
   }
 
-  private async updateReplication(existingReplication: SessionReplication, userSession: SessionUser) {
+  private async updateReplication(existingReplication: SessionReplication, userSession: SessionUser): Promise<string> {
     const { buy, sell, chatId } = existingReplication;
     const updatedReplication = await this.replicationRepository.update(existingReplication.id, { buy, sell });
     if (!updatedReplication.affected) {
