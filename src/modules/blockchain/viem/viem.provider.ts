@@ -29,6 +29,7 @@ import {
   BalanceInfo,
   CheckTokenParams,
   CheckTokenReturnType,
+  CreateWalletReturnType,
   GetBalanceParams,
   GetTokenBalanceParams,
   SendNativeParams,
@@ -37,9 +38,10 @@ import {
   Transaction,
 } from '../types';
 import { OnEvent } from '@nestjs/event-emitter';
+import { BaseNetworkProvider } from '../BaseNetworkProvider';
 
 @Injectable()
-export class ViemProvider implements OnModuleInit, OnModuleDestroy {
+export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, OnModuleDestroy {
   private clients: ViemClientsType;
   private unwatchCallbacks: { [key in ViemNetwork]: () => void };
 
@@ -49,8 +51,9 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     private readonly anvilProvider: AnvilProvider,
     private readonly viemHelper: ViemHelperProvider,
     private readonly constants: ConstantsProvider,
-  ) {}
-  // TODO: abstract class
+  ) {
+    super();
+  }
   async onModuleInit() {
     this.clients = this.viemHelper.getClients();
     if (this.constants.notProd) await this.viemHelper.initAnvil();
@@ -71,7 +74,7 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     this.stopMonitoring();
   }
 
-  async createWallet(network: Network) {
+  async createWallet(network: Network): Promise<CreateWalletReturnType> {
     const privateKey = generatePrivateKey();
     const account = privateKeyToAccount(privateKey);
 
@@ -163,25 +166,6 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     }
 
     return this.viemHelper.formatBalanceResponse(balanceInfo);
-  }
-
-  async getTokenBalance({
-    tokenAddress,
-    walletAddress,
-    network,
-  }: GetTokenBalanceParams): Promise<TokenBalanceReturnType> {
-    const publicClient = this.clients.public[network];
-    const [balanceAmount, symbol, decimals] = await Promise.all([
-      this.viemHelper.balanceOf({ tokenAddress, walletAddress, publicClient }),
-      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
-      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
-    ]);
-
-    return {
-      symbol,
-      decimals,
-      amount: formatUnits(balanceAmount, decimals),
-    };
   }
 
   @OnEvent('monitorDex')
@@ -315,6 +299,25 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
       }
       throw error;
     }
+  }
+
+  private async getTokenBalance({
+    tokenAddress,
+    walletAddress,
+    network,
+  }: GetTokenBalanceParams): Promise<TokenBalanceReturnType> {
+    const publicClient = this.clients.public[network];
+    const [balanceAmount, symbol, decimals] = await Promise.all([
+      this.viemHelper.balanceOf({ tokenAddress, walletAddress, publicClient }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'symbol' }),
+      publicClient.readContract({ address: tokenAddress, abi: erc20Abi, functionName: 'decimals' }),
+    ]);
+
+    return {
+      symbol,
+      decimals,
+      amount: formatUnits(balanceAmount, decimals),
+    };
   }
 
   private async handleTransaction({ tx }: { tx: Transaction }) {

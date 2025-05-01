@@ -28,12 +28,14 @@ export class SubscriptionService {
   ) {}
 
   async subscribeToWallet({ chatId, address, network }: { chatId: number; address: Address; network: Network }) {
-    // TODO: subscribe to own wallet
     const userSession = await this.redisService.getUser(chatId);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address === address);
-
     if (existingSubscription) throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400);
+    const isSubscribeOnOwnWallet = userSession.wallets.find(w => w.address.toLowerCase() === address);
+    if (isSubscribeOnOwnWallet) {
+      throw new BotError('Subscribing on own wallet', 'Вы не можете подписаться на свой кошелек', 400);
+    }
 
     const subscription = this.subscriptionRepository.create({
       user: { id: userSession.userId },

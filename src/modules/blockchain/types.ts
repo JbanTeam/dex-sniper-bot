@@ -9,6 +9,12 @@ type CreateWalletParams = {
   entityManager?: EntityManager;
 };
 
+type CreateWalletReturnType = {
+  network: Network;
+  encryptedPrivateKey: string;
+  address: Address;
+};
+
 type CheckTokenParams = {
   address: Address;
   network: Network;
@@ -94,6 +100,7 @@ type BalanceInfo = {
 
 export {
   CreateWalletParams,
+  CreateWalletReturnType,
   CheckTokenParams,
   CheckTokenReturnType,
   GetBalanceParams,
