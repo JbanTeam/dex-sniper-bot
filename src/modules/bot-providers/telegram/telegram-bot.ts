@@ -12,7 +12,7 @@ import { TgQueryHandler } from './handlers/TgQueryHandler';
 import { TgMessageHandler } from './handlers/TgMessageHandler';
 import { Replication } from '@modules/subscription/replication.entity';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
-import { BotProviderInterface, IncomingMessage, IncomingQuery } from '@src/types/types';
+import { BotProviderInterface, IncomingMessage, IncomingQuery, SessionReplication } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
 
 @Injectable()
@@ -173,7 +173,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  private mapReplications(replications: Replication[], chatId: number) {
+  private mapReplications(replications: Replication[], chatId: number): SessionReplication[] {
     return replications.map(replication => {
       return {
         id: replication.id,

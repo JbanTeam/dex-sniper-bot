@@ -23,6 +23,7 @@ export class BlockchainService {
     private readonly anvilProvider: AnvilProvider,
     private readonly walletService: WalletService,
   ) {
+    // TODO: ?
     this.networkProviders = {
       [Network.BSC]: this.viemProvider,
       [Network.POLYGON]: this.viemProvider,

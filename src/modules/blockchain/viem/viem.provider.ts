@@ -194,7 +194,7 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     const prefix = this.constants.notProd ? 'testPairs' : 'pairs';
     const pairs = await this.redisService.getPairsSet(network, prefix);
     isEtherAddressArr(pairs);
-
+    // TODO: remove consolelogs
     console.log('✅ Pairs:', pairs);
 
     this.unwatchCallbacks[network] = client.watchEvent({
@@ -206,13 +206,18 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
             eventName: 'Swap',
             logs,
           });
-          // TODO: цмклическая покупка
           if (!parsedLogs.length) return;
 
           for (const log of parsedLogs) {
             const tx = await this.viemHelper.parseEventLog(log, network);
             console.log(tx);
             if (!tx) continue;
+
+            const context = await this.redisService.getTxContext(`txContext:${tx.hash}`);
+            if (context) {
+              tx.initiators = context.initiators ?? [];
+              tx.replicationDepth = context.replicationDepth ?? 0;
+            }
 
             const isSubscribed = await this.redisService.existsInSet(`subscriptions:${network}`, tx.to);
             if (!isSubscribed) continue;
@@ -318,6 +323,11 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
     if (!subscriptions?.length) return;
     for (const subscription of subscriptions) {
       try {
+        if (tx.initiators.includes(subscription.user.chatId)) continue;
+
+        const maxDepth = 3;
+        if (tx.replicationDepth >= maxDepth) continue;
+
         await this.replicateTransaction({ subscription, tx });
       } catch (error) {
         if (error instanceof BotError) {
@@ -431,7 +441,7 @@ export class ViemProvider implements OnModuleInit, OnModuleDestroy {
       walletClient,
     });
 
-    const { amountIn, amountOut } = await this.viemHelper.swap({ walletAddress, tx, account, walletClient });
+    const { amountIn, amountOut } = await this.viemHelper.swap({ walletAddress, tx, account, walletClient, chatId });
     const formattedAmountIn = formatUnits(amountIn, inDecimals);
     const formattedAmountOut = formatUnits(amountOut, outDecimals);
 

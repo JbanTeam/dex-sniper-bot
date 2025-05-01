@@ -28,9 +28,8 @@ export class SubscriptionService {
   ) {}
 
   async subscribeToWallet({ chatId, address, network }: { chatId: number; address: Address; network: Network }) {
+    // TODO: subscribe to own wallet
     const userSession = await this.redisService.getUser(chatId);
-
-    if (!userSession) throw new BotError('User not found', 'Пользователь не найден', 404);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address === address);
 
@@ -58,12 +57,14 @@ export class SubscriptionService {
   async unsubscribeFromWallet({ chatId, walletAddress }: { chatId: number; walletAddress: Address }) {
     const userSession = await this.redisService.getUser(chatId);
 
-    if (!userSession.subscriptions?.length)
+    if (!userSession.subscriptions?.length) {
       throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
+    }
 
     const sessionSubscription = userSession.subscriptions.find(sub => sub.address === walletAddress);
-    if (!sessionSubscription)
+    if (!sessionSubscription) {
       throw new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400);
+    }
 
     const subscription = await this.subscriptionRepository.findOne({
       where: { id: sessionSubscription.id },
@@ -151,7 +152,7 @@ export class SubscriptionService {
   async createOrUpdateReplication(tempReplication: TempReplication) {
     const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
     if (!chatId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data', 'Некорректные данные', 400);
+      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
     }
     const userSession = await this.redisService.getUser(chatId);
 
@@ -196,7 +197,7 @@ export class SubscriptionService {
   private async createReplication(tempReplication: TempReplication, userSession: SessionUser) {
     const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data', 'Некорректные данные', 400);
+      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
     }
 
     const replicationData = {
@@ -215,7 +216,7 @@ export class SubscriptionService {
     });
 
     if (!fullReplication) {
-      throw new BotError('Replication not found', 'Репликация не найдена', 404);
+      throw new BotError('Replication not found', 'Не удалось установить повтор сделок', 404);
     }
 
     let tokenAddress = fullReplication.token.address;
@@ -257,7 +258,7 @@ export class SubscriptionService {
   }) {
     const { subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data', 'Некорректные данные', 400);
+      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
     }
     const sessionReplication = {
       ...replication,

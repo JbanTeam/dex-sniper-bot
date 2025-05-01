@@ -82,6 +82,7 @@ type ApproveParams = {
 };
 
 type SwapParams = {
+  chatId: number;
   walletAddress: Address;
   tx: Transaction;
   account: Account;

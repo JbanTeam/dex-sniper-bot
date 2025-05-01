@@ -192,8 +192,9 @@ export class RedisService {
     return await this.redisClient.hgetall(key);
   }
 
-  async setHashFeilds(key: string, fields: object) {
-    return await this.redisClient.hmset(key, fields);
+  async setHashFeilds(key: string, fields: object, expire?: number) {
+    await this.redisClient.hmset(key, fields);
+    if (expire) await this.redisClient.expire(`${key}`, expire);
   }
 
   async getUserId(chatId: number) {
@@ -254,6 +255,12 @@ export class RedisService {
     isEtherAddress(token1);
 
     return { token0, token1 };
+  }
+
+  async getTxContext(key: string) {
+    const context = await this.redisClient.hgetall(key);
+    if (!context) return null;
+    return this.parseData<{ replicationDepth: number; initiators: number[] }>(context);
   }
 
   async getSubscriptions(chatId: number): Promise<SessionSubscription[] | null> {

@@ -58,6 +58,9 @@ type Transaction = {
   tokenIn: Address;
   tokenOut: Address;
   network: Network;
+  hash: Address;
+  initiators: number[];
+  replicationDepth: number;
   data: string;
 };
 

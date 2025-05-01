@@ -212,6 +212,9 @@ export class ViemHelperProvider implements OnModuleInit {
       tokenIn,
       tokenOut,
       network,
+      hash: log.transactionHash.toLowerCase() as Address,
+      initiators: [],
+      replicationDepth: 0,
       data: log.data,
     };
 
@@ -334,7 +337,7 @@ export class ViemHelperProvider implements OnModuleInit {
     });
   }
 
-  async swap({ walletAddress, tx, account, walletClient }: SwapParams) {
+  async swap({ walletAddress, tx, account, walletClient, chatId }: SwapParams) {
     const { chain } = this.getSharedVars(tx.network);
     const swapArgs = await this.initSwapArgs({ tx, walletAddress });
     const { fn, args, value } = swapArgs;
@@ -348,6 +351,15 @@ export class ViemHelperProvider implements OnModuleInit {
       value,
       chain,
     });
+
+    await this.redisService.setHashFeilds(
+      `txContext:${hash}`,
+      {
+        initiators: JSON.stringify([...(tx.initiators ?? []), chatId]),
+        replicationDepth: (tx.replicationDepth ?? 0) + 1,
+      },
+      300,
+    );
 
     const publicClient = this.clients.public[tx.network];
     const receipt = await publicClient.getTransactionReceipt({ hash });
