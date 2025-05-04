@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { IncomingMessage } from '@src/types/types';
-import { UserService } from '@modules/user/user.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -14,15 +13,16 @@ import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { UserTokenService } from '@modules/user-token/user-token.service';
+import { ReplicationService } from '@modules/replication/replication.service';
 
 @Injectable()
 export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgCommandReturnType> {
   constructor(
-    private readonly userService: UserService,
     private readonly tokenService: UserTokenService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly replicationService: ReplicationService,
     private readonly walletService: WalletService,
     private readonly constants: ConstantsProvider,
   ) {
@@ -253,7 +253,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   getReplications: TgCommandFunction = async message => {
     try {
-      const reply = await this.subscriptionService.getReplications(message.chatId);
+      const reply = await this.replicationService.getReplications(message.chatId);
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {

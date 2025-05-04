@@ -1,9 +1,9 @@
 import { IsEnum } from 'class-validator';
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
-import { Subscription } from './subscription.entity';
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
+import { Subscription } from '@modules/subscription/subscription.entity';
 import { UserToken } from '@modules/user-token/user-token.entity';
 
 @Entity()

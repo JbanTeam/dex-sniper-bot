@@ -11,9 +11,18 @@ import { TgCommandHandler } from './telegram/handlers/TgCommandHandler';
 import { TgQueryHandler } from './telegram/handlers/TgQueryHandler';
 import { TgMessageHandler } from './telegram/handlers/TgMessageHandler';
 import { UserTokenModule } from '@modules/user-token/user-token.module';
+import { ReplicationModule } from '@modules/replication/replication.module';
 
 @Module({
-  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule, WalletModule, UserTokenModule],
+  imports: [
+    UserModule,
+    RedisModule,
+    BlockchainModule,
+    SubscriptionModule,
+    WalletModule,
+    UserTokenModule,
+    ReplicationModule,
+  ],
   providers: [BotService, TelegramBot, TgCommandHandler, TgQueryHandler, TgMessageHandler],
   exports: [BotService],
 })

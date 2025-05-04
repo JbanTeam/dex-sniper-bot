@@ -1,9 +1,9 @@
 import { IsEnum, IsEthereumAddress, ValidateNested } from 'class-validator';
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 
-import { User } from '../user/user.entity';
 import { Network } from '@src/types/types';
-import { Replication } from './replication.entity';
+import { User } from '@modules/user/user.entity';
+import { Replication } from '@modules/replication/replication.entity';
 
 @Entity()
 export class Subscription {

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
-import { UserService } from '@modules/user/user.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { WalletService } from '@modules/wallet/wallet.service';
@@ -13,15 +12,16 @@ import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/ty
 import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UserTokenService } from '@modules/user-token/user-token.service';
+import { ReplicationService } from '@modules/replication/replication.service';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
   constructor(
-    private readonly userService: UserService,
     private readonly tokenService: UserTokenService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly replicationService: ReplicationService,
     private readonly walletService: WalletService,
     private readonly constants: ConstantsProvider,
   ) {
@@ -204,7 +204,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
 
       tempReplication.tokenId = +tokenId;
-      const reply = await this.subscriptionService.createOrUpdateReplication(tempReplication);
+      const reply = await this.replicationService.createOrUpdateReplication(tempReplication);
 
       return { text: `Параметры повтора сделок установлены ✅\n\n${reply}`, options: { parse_mode: 'html' } };
     } catch (error) {

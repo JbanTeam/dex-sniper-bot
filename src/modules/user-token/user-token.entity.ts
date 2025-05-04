@@ -3,7 +3,7 @@ import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'c
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
-import { Replication } from '@modules/subscription/replication.entity';
+import { Replication } from '@modules/replication/replication.entity';
 
 @Entity()
 export class UserToken {

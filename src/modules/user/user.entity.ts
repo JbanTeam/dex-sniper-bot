@@ -4,7 +4,7 @@ import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } f
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user-token/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
-import { Replication } from '@modules/subscription/replication.entity';
+import { Replication } from '@modules/replication/replication.entity';
 
 @Entity()
 export class User {

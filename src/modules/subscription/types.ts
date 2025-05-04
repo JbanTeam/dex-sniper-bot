@@ -1,10 +1,9 @@
-import { Address, Network, TempReplication } from '@src/types/types';
 import { Subscription } from './subscription.entity';
-import { Replication } from './replication.entity';
+import { Address, Network } from '@src/types/types';
 
 type SubscribeToWalletParams = { chatId: number; address: Address; network: Network };
 
-type UnsubscribeFromWallwtParams = { chatId: number; walletAddress: Address };
+type UnsubscribeFromWalletParams = { chatId: number; walletAddress: Address };
 
 type UpdateSubscriptionParams = {
   chatId: number;
@@ -13,10 +12,4 @@ type UpdateSubscriptionParams = {
   limit: number;
 };
 
-type PrepareSessionReplication = {
-  replication: Replication;
-  tokenAddress: Address;
-  tempReplication: TempReplication;
-};
-
-export { SubscribeToWalletParams, UnsubscribeFromWallwtParams, UpdateSubscriptionParams, PrepareSessionReplication };
+export { SubscribeToWalletParams, UnsubscribeFromWalletParams, UpdateSubscriptionParams };

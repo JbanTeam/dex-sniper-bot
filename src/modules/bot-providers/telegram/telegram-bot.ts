@@ -10,7 +10,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { TgCommandHandler } from './handlers/TgCommandHandler';
 import { TgQueryHandler } from './handlers/TgQueryHandler';
 import { TgMessageHandler } from './handlers/TgMessageHandler';
-import { Replication } from '@modules/subscription/replication.entity';
+import { Replication } from '@modules/replication/replication.entity';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { BotProviderInterface, IncomingMessage, IncomingQuery, SessionReplication } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
