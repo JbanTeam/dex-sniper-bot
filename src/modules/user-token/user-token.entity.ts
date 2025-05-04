@@ -1,8 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'class-validator';
 
-import { User } from './user.entity';
 import { Network } from '@src/types/types';
+import { User } from '@modules/user/user.entity';
 import { Replication } from '@modules/subscription/replication.entity';
 
 @Entity()

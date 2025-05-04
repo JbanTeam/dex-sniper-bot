@@ -12,11 +12,13 @@ import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../t
 import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
+import { UserTokenService } from '@modules/user-token/user-token.service';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
   constructor(
     private readonly userService: UserService,
+    private readonly tokenService: UserTokenService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
@@ -59,19 +61,13 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
       isNetwork(network);
 
-      const { tokens } = await this.userService.addToken({
+      const reply = await this.tokenService.addToken({
         userSession,
         address: userSession.tempToken,
         network: network,
       });
 
-      let reply = `Токен успешно добавлен 🔥🔥🔥\n\n<u>Ваши токены:</u>\n`;
-
-      tokens.forEach((token, index) => {
-        reply += `${index + 1}. <b>Сеть:</b> <u>${token.network}</u> / <b>Токен:</b> <u>${token.name} (${token.symbol})</u>\n<code>${token.address}</code>\n\n`;
-      });
-
-      return { text: reply, options: { parse_mode: 'html' } };
+      return { text: `Токен успешно добавлен 🔥🔥🔥\n\n${reply}`, options: { parse_mode: 'html' } };
     } catch (error) {
       return this.handleError(error, 'Error while adding token', 'Ошибка при добавлении токена');
     }
@@ -86,11 +82,11 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       isValidRemoveQueryData(network);
 
       if (network === 'all') {
-        await this.userService.removeToken({ chatId });
+        await this.tokenService.removeToken({ chatId });
 
         reply = `Все токены успешно удалены 🔥🔥🔥`;
       } else {
-        await this.userService.removeToken({ chatId, network });
+        await this.tokenService.removeToken({ chatId, network });
 
         reply = `Все токены в сети ${network} успешно удалены 🔥🔥🔥`;
       }

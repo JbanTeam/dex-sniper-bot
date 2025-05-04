@@ -1,6 +1,6 @@
 import { Chain } from 'viem';
 import { Wallet } from '@modules/wallet/wallet.entity';
-import { UserToken } from '@modules/user/user-token.entity';
+import { UserToken } from '@modules/user-token/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';

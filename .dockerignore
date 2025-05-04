@@ -1,6 +1,6 @@
-node_modules
+node_modules/
 Dockerfile
-anvil_data
+anvil_data/
 .dockerignore
 /hat/
 hat/node_modules

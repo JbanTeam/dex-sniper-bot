@@ -18,6 +18,9 @@ import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDelete
 @Injectable()
 export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDeleteMsgParams> {
   private TG_URL: string = 'https://api.telegram.org/bot';
+  private stopped = false;
+  private offset = 0;
+  private retryDelay = 3000;
 
   constructor(
     private readonly userService: UserService,
@@ -32,8 +35,15 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   }
 
   async start(): Promise<void> {
+    this.stopped = false;
     await this.setCommands();
     await this.onMessage();
+    console.log('Telegram bot started');
+  }
+
+  stop(): void {
+    this.stopped = true;
+    console.log('Telegram bot stopped');
   }
 
   async sendMessage({ chatId, text, options = {} }: TgSendMsgParams): Promise<void> {
@@ -64,28 +74,36 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
   }
 
   async onMessage(): Promise<void> {
-    let offset = 0;
+    while (!this.stopped) {
+      try {
+        const url = `${this.TG_URL}/getUpdates?offset=${this.offset}&allowed_updates=["message", "callback_query"]`;
+        const response = await axios.get(url);
+        const data: TgUpdateResponse = response.data as TgUpdateResponse;
 
-    while (true) {
-      const url = `${this.TG_URL}/getUpdates?offset=${offset}&allowed_updates=["message", "callback_query"]`;
-      const response = await axios.get(url);
+        if (data.ok && data.result.length > 0) {
+          for (const update of data.result) {
+            if (this.stopped) return;
 
-      const data: TgUpdateResponse = response.data as TgUpdateResponse;
+            if (update.message) {
+              const message = this.parseMessage(update.message);
+              await this.setSession(update.message);
+              await this.handleIncomingMessage(message);
+            } else if (update.callback_query) {
+              const query = this.parseQuery(update.callback_query);
+              await this.setSession(update.callback_query);
+              await this.handleIncomingMessage(query);
+            }
 
-      if (data.ok && data.result.length > 0) {
-        for (const update of data.result) {
-          if (update.message) {
-            const message = this.parseMessage(update.message);
-            await this.setSession(update.message);
-            await this.handleIncomingMessage(message);
-          } else if (update.callback_query) {
-            const query = this.parseQuery(update.callback_query);
-            await this.setSession(update.callback_query);
-            await this.handleIncomingMessage(query);
+            this.offset = update.update_id + 1;
           }
-
-          if (update) offset = update.update_id + 1;
         }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Error while getting updates: ${message}`);
+        if (this.stopped) return;
+
+        console.log(`Retrying in ${this.retryDelay / 1000} seconds...`);
+        await new Promise(res => setTimeout(res, this.retryDelay));
       }
     }
   }

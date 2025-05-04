@@ -12,14 +12,18 @@ import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandH
 import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
+import { WalletService } from '@modules/wallet/wallet.service';
+import { UserTokenService } from '@modules/user-token/user-token.service';
 
 @Injectable()
 export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgCommandReturnType> {
   constructor(
     private readonly userService: UserService,
+    private readonly tokenService: UserTokenService,
     private readonly redisService: RedisService,
     private readonly blockchainService: BlockchainService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly walletService: WalletService,
     private readonly constants: ConstantsProvider,
   ) {
     const logger = new Logger(TgCommandHandler.name);
@@ -104,7 +108,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       if (tokenAddress) {
         isEtherAddress(tokenAddress);
-        await this.userService.removeToken({
+        await this.tokenService.removeToken({
           chatId: userSession.chatId,
           address: tokenAddress,
         });
@@ -132,7 +136,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   getTokens: TgCommandFunction = async message => {
     try {
-      const reply = await this.userService.getTokens(message.chatId);
+      const reply = await this.tokenService.getTokens(message.chatId);
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {
@@ -142,7 +146,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
   getWallets: TgCommandFunction = async message => {
     try {
-      const reply = await this.userService.getWallets(message.chatId);
+      const reply = await this.walletService.getWallets(message.chatId);
 
       return { text: reply, options: { parse_mode: 'html' } };
     } catch (error) {

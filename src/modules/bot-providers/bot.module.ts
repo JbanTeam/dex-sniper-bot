@@ -10,9 +10,10 @@ import { TelegramBot } from './telegram/telegram-bot';
 import { TgCommandHandler } from './telegram/handlers/TgCommandHandler';
 import { TgQueryHandler } from './telegram/handlers/TgQueryHandler';
 import { TgMessageHandler } from './telegram/handlers/TgMessageHandler';
+import { UserTokenModule } from '@modules/user-token/user-token.module';
 
 @Module({
-  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule, WalletModule],
+  imports: [UserModule, RedisModule, BlockchainModule, SubscriptionModule, WalletModule, UserTokenModule],
   providers: [BotService, TelegramBot, TgCommandHandler, TgQueryHandler, TgMessageHandler],
   exports: [BotService],
 })

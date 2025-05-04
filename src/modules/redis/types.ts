@@ -1,5 +1,5 @@
 import { ChainableCommander } from 'ioredis';
-import { DeleteConditions } from '@modules/user/types';
+import { DeleteConditions } from '@modules/user-token/types';
 import {
   SessionUser,
   SessionReplication,

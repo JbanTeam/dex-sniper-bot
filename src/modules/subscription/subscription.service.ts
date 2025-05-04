@@ -99,7 +99,7 @@ export class SubscriptionService {
       {} as Record<string, SessionSubscription[]>,
     );
 
-    let reply = '';
+    let reply = '<b>Ваши подписки:</b>\n';
     Object.entries(groupedSubscriptions).forEach(([exchange, subs]) => {
       reply += `<u><b>${exchange}:</b></u>\n`;
       subs.forEach((sub, index) => {
@@ -131,15 +131,15 @@ export class SubscriptionService {
       {} as Record<string, SessionReplication[]>,
     );
 
-    let reply = '';
+    let reply = '<u>Ваши параметры повторов сделок:</u>\n\n';
     Object.entries(groupedReplications).forEach(([exchange, reps]) => {
-      reply += `<u><b>${exchange}:</b></u>\n`;
+      reply += `<u>${exchange}:</u>\n`;
       reps.forEach((rep, index) => {
-        reply += `<b>${index + 1}. Кошелек:</b> <code>${rep.subscriptionAddress}</code>\n`;
+        reply += `<b>${index + 1}. 💰 Кошелек:</b> <code>${rep.subscriptionAddress}</code>\n`;
         reply += `<b>${rep.tokenSymbol}:</b> <code>${rep.tokenAddress}</code>\n`;
         reply += `<b>Лимиты:</b> покупка - ${rep.buy}; продажа - ${rep.sell}\n`;
       });
-      reply += '\n\n';
+      reply += '\n';
     });
 
     return reply;

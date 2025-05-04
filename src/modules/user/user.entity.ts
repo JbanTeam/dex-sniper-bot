@@ -1,8 +1,8 @@
 import { IsNumber, ValidateNested } from 'class-validator';
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
 
-import { UserToken } from './user-token.entity';
 import { Wallet } from '@modules/wallet/wallet.entity';
+import { UserToken } from '@modules/user-token/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
 import { Replication } from '@modules/subscription/replication.entity';
 
