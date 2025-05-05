@@ -188,6 +188,8 @@ export class ViemHelperProvider implements OnModuleInit {
     const pair = await this.redisService.getPair({ prefix, pairAddress: address, network });
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
 
+    const rawTx = await this.clients.public[network].getTransaction({ hash: log.transactionHash });
+
     if (!pair) return null;
 
     if (amount0In > 0) {
@@ -205,6 +207,7 @@ export class ViemHelperProvider implements OnModuleInit {
       routerAddress: routerAddress.toLowerCase() as Address,
       sender: sender.toLowerCase() as Address,
       to: to.toLowerCase() as Address,
+      userAddress: rawTx.from.toLowerCase() as Address,
       amountIn,
       amountOut,
       tokenIn,
@@ -387,8 +390,6 @@ export class ViemHelperProvider implements OnModuleInit {
       args: [nativeToken, tokenAddress],
     });
 
-    console.log('✅ Pair address:', pairAddress);
-
     if (pairAddress === '0x0000000000000000000000000000000000000000') {
       throw new BotError('Pair does not exist', 'Пара не существует', 400);
     }
@@ -405,9 +406,6 @@ export class ViemHelperProvider implements OnModuleInit {
         functionName: 'token1',
       }),
     ]);
-
-    console.log('✅ token0:', token0);
-    console.log('✅ token1:', token1);
 
     return { pairAddress, token0, token1 };
   }

@@ -202,7 +202,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
               tx.replicationDepth = context.replicationDepth ?? 0;
             }
 
-            const isSubscribed = await this.redisService.existsInSet(`subscriptions:${network}`, tx.to);
+            const isSubscribed = await this.redisService.existsInSet(`subscriptions:${network}`, tx.userAddress);
             if (!isSubscribed) continue;
 
             const prefix = this.constants.notProd ? 'testTokens' : 'tokens';
@@ -320,7 +320,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
   }
 
   private async handleTransaction({ tx }: { tx: Transaction }): Promise<void> {
-    const subscriptions = await this.subscriptionService.findSubscriptionsByAddress(tx.to);
+    const subscriptions = await this.subscriptionService.findSubscriptionsByAddress(tx.userAddress);
 
     if (!subscriptions?.length) return;
     for (const subscription of subscriptions) {
@@ -425,7 +425,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       replications: userSession.replications,
       subscriptionAddress: subscription.address,
     });
-
+    console.log('matchedReplication', matchedReplication);
     if (!matchedReplication) return;
 
     if (!wallet) {

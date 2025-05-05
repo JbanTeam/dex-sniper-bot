@@ -23,7 +23,6 @@ type CreateTokenParams = {
 };
 
 type CreateTokenReturnType = {
-  exchangeAddress: Address;
   tokenAddress: Address;
   pairAddresses: PairAddresses;
 };
@@ -143,10 +142,11 @@ type DeployTokenParams = {
 
 type AnvilSwapParams = {
   recipientAddress: Address;
-  value: bigint;
+  amountIn: bigint;
   deadline: bigint;
   path: Address[];
   fn: ErcSwapFnType;
+  minAmountOut: bigint;
 };
 
 type AddLiquidityParams = { exchangeAddress: Address; tokenAddress: Address; network: Network; decimals: number };

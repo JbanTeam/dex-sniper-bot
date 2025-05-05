@@ -21,7 +21,9 @@ import { BotError } from '@src/errors/BotError';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { ViemHelperProvider } from '../viem-helper.provider';
+import { parsedRouterAbi } from '@src/utils/constants';
 import { abi as coinAbi, bytecode as coinBytecode } from '@src/contract-artifacts/MyToken.json';
+import { abi as pairAbi } from '@src/contract-artifacts/UniswapV2Pair.json';
 import { abi as factoryAbi, bytecode as factoryBytecode } from '@src/contract-artifacts/UniswapV2Factory.json';
 import { abi as routerAbi, bytecode as routerBytecode } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { abi as wbnbAbi, bytecode as wbnbBytecode } from '@src/contract-artifacts/MockWBNB.json';
@@ -113,7 +115,8 @@ export class AnvilProvider {
     walletAddress,
   }: CreateTestTokenParams): Promise<CreateTestTokenReturnType> {
     const { name, symbol, decimals, network } = token;
-    const { exchangeAddress, tokenAddress, pairAddresses } = await this.createToken({
+    const { exchangeAddress, recipientAddress } = this.constants.anvilAddresses;
+    const { tokenAddress, pairAddresses } = await this.createToken({
       name,
       symbol,
       decimals,
@@ -123,6 +126,7 @@ export class AnvilProvider {
 
     await this.getBalance({ tokenAddress, walletAddress: exchangeAddress, name, decimals });
     await this.sendTestTokens({ tokenAddress, sender: exchangeAddress, walletAddress, decimals });
+    await this.sendTestTokens({ tokenAddress, sender: exchangeAddress, walletAddress: recipientAddress, decimals });
 
     return {
       token: {
@@ -133,19 +137,89 @@ export class AnvilProvider {
     };
   }
 
-  async sendFakeSwap(testToken: SessionUserToken): Promise<void> {
+  async fakeSwapTo(testToken: SessionUserToken): Promise<void> {
     const { recipientAddress } = this.constants.anvilAddresses;
 
-    const value = parseEther('1');
+    const amountIn = parseEther('1');
     const path = [this.cachedContracts.nativeToken, testToken.address];
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 60);
 
     await this.swap({
       recipientAddress,
-      value,
+      amountIn,
       deadline,
       path,
       fn: 'swapExactETHForTokens',
+      minAmountOut: 0n,
+    });
+
+    await this.getBalance({
+      tokenAddress: testToken.address,
+      walletAddress: recipientAddress,
+      name: testToken.name,
+      decimals: testToken.decimals,
+    });
+  }
+
+  async fakeSwapFrom(testToken: SessionUserToken): Promise<void> {
+    const { recipientAddress } = this.constants.anvilAddresses;
+
+    const { pairAddress } = await this.viemHelper.getPair({
+      tokenAddress: testToken.address,
+      nativeToken: this.cachedContracts.nativeToken,
+      factoryAddress: this.cachedContracts.factoryAddress,
+      publicClient: this.publicClient,
+    });
+
+    const reserves = (await this.publicClient.readContract({
+      address: pairAddress,
+      abi: pairAbi,
+      functionName: 'getReserves',
+      args: [],
+    })) as bigint[];
+    console.log('Pool reserves:', reserves);
+
+    const allowance = await this.publicClient.readContract({
+      address: testToken.address,
+      abi: erc20Abi,
+      functionName: 'allowance',
+      args: [recipientAddress, this.cachedContracts.routerAddress],
+    });
+    console.log('allowance', allowance);
+    if (allowance < parseUnits('1000', testToken.decimals)) {
+      console.log('Approving router...');
+      await this.walletClient.writeContract({
+        address: testToken.address,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [this.cachedContracts.routerAddress, parseUnits('2000', testToken.decimals)],
+        account: recipientAddress,
+        chain: anvil,
+      });
+    }
+
+    const amountIn = parseUnits('1000', testToken.decimals);
+    const path = [testToken.address, this.cachedContracts.nativeToken];
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 60);
+
+    const slippageBps = 300;
+    const [, expectedAmountOut] = await this.publicClient.readContract({
+      address: this.cachedContracts.routerAddress,
+      abi: parsedRouterAbi,
+      functionName: 'getAmountsOut',
+      args: [amountIn, path],
+    });
+
+    const minAmountOut = (expectedAmountOut * BigInt(10000 - slippageBps)) / 10000n;
+    console.log('minAmountOut', minAmountOut);
+
+    await this.swap({
+      recipientAddress,
+      amountIn,
+      deadline,
+      path,
+      fn: 'swapExactTokensForETH',
+      minAmountOut,
     });
 
     await this.getBalance({
@@ -181,11 +255,12 @@ export class AnvilProvider {
     count,
     network,
   }: CreateTokenParams): Promise<CreateTokenReturnType> {
-    const { exchangeAddress } = this.constants.anvilAddresses;
+    const { exchangeAddress, recipientAddress } = this.constants.anvilAddresses;
 
     const tokenAddress = await this.deployToken({ exchangeAddress, name, symbol, decimals, count });
     await this.depositWbnb(exchangeAddress);
     await this.approve(exchangeAddress, tokenAddress);
+    await this.approve(recipientAddress, tokenAddress);
     await this.addLiquidity({ exchangeAddress, tokenAddress, network, decimals });
 
     const nativeToken = this.cachedContracts.nativeToken;
@@ -193,7 +268,7 @@ export class AnvilProvider {
     const publicClient = this.publicClient;
     const pairAddresses = await this.viemHelper.getPair({ tokenAddress, nativeToken, factoryAddress, publicClient });
 
-    return { exchangeAddress, tokenAddress, pairAddresses };
+    return { tokenAddress, pairAddresses };
   }
 
   private async getBalance({ tokenAddress, walletAddress, decimals, name }: TestBalanceParams): Promise<void> {
@@ -339,22 +414,49 @@ export class AnvilProvider {
     });
   }
 
-  private async swap({ recipientAddress, value, deadline, path, fn }: AnvilSwapParams): Promise<void> {
-    const hash = await this.walletClient.writeContract({
-      address: this.cachedContracts.routerAddress,
-      abi: routerAbi,
-      functionName: fn,
-      args: [0n, path, recipientAddress, deadline],
-      chain: anvil,
-      account: recipientAddress,
-      value,
-    });
-    const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== 'success') {
-      throw new BotError(`Swap not done ❌`, `Swap не был выполнен ❌`, 400);
-    }
+  private async swap({ recipientAddress, amountIn, deadline, path, fn, minAmountOut }: AnvilSwapParams): Promise<void> {
+    let args: any[];
+    let value: bigint | undefined;
 
-    console.log('#️⃣ Swap tx hash:', hash);
+    if (fn === 'swapExactETHForTokens') {
+      args = [minAmountOut, path, recipientAddress, deadline];
+      value = amountIn;
+    } else if (fn === 'swapExactTokensForETH') {
+      args = [amountIn, minAmountOut, path, recipientAddress, deadline];
+      value = undefined;
+    } else if (fn === 'swapExactTokensForTokens') {
+      args = [amountIn, minAmountOut, path, recipientAddress, deadline];
+      value = undefined;
+    } else {
+      throw new BotError(`Unsupported function`, `Неизвестная функция свапа`, 400);
+    }
+    try {
+      const hash = await this.walletClient.writeContract({
+        address: this.cachedContracts.routerAddress,
+        abi: routerAbi,
+        functionName: fn,
+        args,
+        chain: anvil,
+        account: recipientAddress,
+        value,
+      });
+
+      const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') {
+        throw new BotError(`Swap not done ❌`, `Swap не был выполнен ❌`, 400);
+      }
+
+      console.log('#️⃣ Swap tx hash:', hash);
+    } catch (error) {
+      console.error('Swap error details:', {
+        function: fn,
+        args,
+        path,
+        amountIn: amountIn.toString(),
+        recipientAddress,
+      });
+      throw error;
+    }
   }
 
   private async addLiquidity({ exchangeAddress, tokenAddress, network, decimals }: AddLiquidityParams): Promise<void> {

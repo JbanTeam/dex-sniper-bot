@@ -58,8 +58,10 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         return this.getReplications(message);
       case command.startsWith('/send'):
         return this.sendTokens(message);
-      case command.startsWith('/fake'):
-        return this.sendFakeSwap(message);
+      case command.startsWith('/faketo'):
+        return this.fakeSwapTo(message);
+      case command.startsWith('/fakefrom'):
+        return this.fakeSwapFrom(message);
       case command.startsWith('/help'):
         return { text: helpMessage };
       default:
@@ -329,7 +331,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
     return { text: userMsg, options: { parse_mode: 'html' } };
   }
 
-  private sendFakeSwap: TgCommandFunction = async message => {
+  private fakeSwapTo: TgCommandFunction = async message => {
     if (this.constants.NODE_ENV === 'production') {
       return { text: 'Неизвестная команда, попробуйте /help' };
     }
@@ -343,7 +345,29 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const testToken = testTokens[0];
 
       if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
-      await this.blockchainService.sendFakeSwap(testToken);
+      await this.blockchainService.fakeSwapTo(testToken);
+
+      return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
+    } catch (error) {
+      return this.handleError(error, 'Error while sending fake transaction', 'Ошибка при отправке транзакции');
+    }
+  };
+
+  private fakeSwapFrom: TgCommandFunction = async message => {
+    if (this.constants.NODE_ENV === 'production') {
+      return { text: 'Неизвестная команда, попробуйте /help' };
+    }
+
+    try {
+      const testTokens = await this.redisService.getTokens(message.chatId, 'testTokens');
+
+      if (!testTokens?.length) {
+        throw new BotError('You have no tokens', 'У вас нет токенов, чтобы отправить транзакцию', 400);
+      }
+      const testToken = testTokens[0];
+
+      if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
+      await this.blockchainService.fakeSwapFrom(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
     } catch (error) {

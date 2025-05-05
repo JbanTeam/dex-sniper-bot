@@ -65,7 +65,6 @@ export class UserTokenService {
 
   async removeToken({ chatId, address, network }: RemoveTokenParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
-
     if (!userSession) throw new BotError('User not found', 'Пользователь не найден', 404);
     if (!userSession.tokens.length) {
       throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404);

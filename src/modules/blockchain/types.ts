@@ -59,6 +59,7 @@ type Transaction = {
   routerAddress: Address;
   sender: Address;
   to: Address;
+  userAddress: Address;
   amountIn: bigint;
   amountOut: bigint;
   tokenIn: Address;

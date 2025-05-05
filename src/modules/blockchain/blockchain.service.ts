@@ -78,9 +78,15 @@ export class BlockchainService {
     });
   }
 
-  async sendFakeSwap(testToken: SessionUserToken): Promise<void> {
+  async fakeSwapTo(testToken: SessionUserToken): Promise<void> {
     const { network } = testToken;
     const provider = this.testNetworkProviders[network];
-    await provider.sendFakeSwap(testToken);
+    await provider.fakeSwapTo(testToken);
+  }
+
+  async fakeSwapFrom(testToken: SessionUserToken): Promise<void> {
+    const { network } = testToken;
+    const provider = this.testNetworkProviders[network];
+    await provider.fakeSwapFrom(testToken);
   }
 }
