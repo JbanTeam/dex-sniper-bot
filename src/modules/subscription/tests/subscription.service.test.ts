@@ -169,7 +169,7 @@ describe('SubscriptionService', () => {
 
       expect(result).toContain('<b>Ваши подписки:</b>');
       expect(result).toContain('<u><b>Binance (BSC):</b></u>');
-      expect(result).toContain('<code>0x123</code>');
+      expect(result).toContain('<code>0xSubAddress</code>');
     });
 
     it('should throw error when no subscriptions found', async () => {

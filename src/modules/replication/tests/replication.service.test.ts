@@ -118,7 +118,7 @@ describe('ReplicationService', () => {
       const result = await replicationService.getReplications(123);
 
       expect(result).toContain('<u>Ваши параметры повторов сделок:</u>');
-      expect(result).toContain('<b>1. 💰 Кошелек:</b> <code>0x123</code>');
+      expect(result).toContain('<b>1. 💰 Кошелек:</b> <code>0xSubAddress</code>');
     });
 
     it('should throw error when no replications found', async () => {
@@ -145,10 +145,10 @@ describe('ReplicationService', () => {
       const result = await replicationService.createOrUpdateReplication(tempReplication);
 
       expect(mockReplicationRepository.update).toHaveBeenCalledWith(mockSessionReplication.id, { buy: 150, sell: 200 });
-      expect(result).toContain('<u>Кошелек:</u> <b>BSC</b> <code>0x123</code>');
+      expect(result).toContain('<u>Кошелек:</u> <b>BSC</b> <code>0xSubAddress</code>');
     });
 
-    it('should create a new replication if none exists', async () => {
+    it('should create a new replication if not exists', async () => {
       const tempReplication: TempReplication = {
         action: 'sell',
         limit: 250,
@@ -168,7 +168,7 @@ describe('ReplicationService', () => {
 
       expect(mockReplicationRepository.create).toHaveBeenCalled();
       expect(mockReplicationRepository.save).toHaveBeenCalled();
-      expect(result).toContain('<u>Кошелек:</u> <b>BSC</b> <code>0x123</code>');
+      expect(result).toContain('<u>Кошелек:</u> <b>BSC</b> <code>0xSubAddress</code>');
     });
 
     it('should throw error for invalid data', async () => {
