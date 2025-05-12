@@ -51,7 +51,7 @@ import {
 export class ViemHelperProvider implements OnModuleInit {
   private readonly logger = new Logger(ViemHelperProvider.name);
   private cachedContracts: CachedContractsType = {} as CachedContractsType;
-  private readonly clients: ViemClientsType;
+  private clients: ViemClientsType;
 
   constructor(
     private readonly redisService: RedisService,
