@@ -29,8 +29,6 @@ type RemoveTokenParams = {
   deleteConditions: DeleteConditions;
 };
 
-type AddTokenToSetParams = { tokenAddress: Address; network: Network; prefix: string };
-
 type GetPairParams = { prefix: string; pairAddress: Address; network: Network };
 
 type PairType = { token0: Address; token1: Address };
@@ -71,7 +69,6 @@ type CleanTokenSetsParams = {
 
 export {
   AddTokenParams,
-  AddTokenToSetParams,
   AddPairParams,
   GetPairParams,
   PairType,

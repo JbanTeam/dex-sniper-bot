@@ -19,7 +19,6 @@ import {
   FilterTokensParams,
   CleanTokenSetsParams,
   AddPairParams,
-  AddTokenToSetParams,
   GetPairParams,
   PairType,
   TxContextType,
@@ -32,7 +31,7 @@ import { isEtherAddress } from '@src/types/typeGuards';
 
 @Injectable()
 export class RedisService {
-  private readonly redisClient: Redis;
+  private redisClient: Redis;
 
   constructor(private readonly constants: ConstantsProvider) {
     this.redisClient = new Redis({
@@ -150,18 +149,6 @@ export class RedisService {
     await this.redisClient.hset(`user:${chatId}`, key, value);
   }
 
-  async setUserFields(chatId: number, fields: object): Promise<void> {
-    await this.redisClient.hmset(`user:${chatId}`, fields);
-  }
-
-  async addSubscriptionToSet(subscriptionAddress: Address): Promise<void> {
-    await this.redisClient.sadd('subscriptions', subscriptionAddress);
-  }
-
-  async addTokenToSet({ tokenAddress, network, prefix }: AddTokenToSetParams): Promise<void> {
-    await this.redisClient.sadd(`${prefix}:${network}`, tokenAddress);
-  }
-
   async existsInSet(setName: string, value: string): Promise<number> {
     return await this.redisClient.sismember(setName, value);
   }
@@ -185,23 +172,6 @@ export class RedisService {
   async setHashFeilds(key: string, fields: object, expire?: number): Promise<void> {
     await this.redisClient.hmset(key, fields);
     if (expire) await this.redisClient.expire(`${key}`, expire);
-  }
-
-  async getUserId(chatId: number): Promise<number | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'userId');
-    if (!userData) return null;
-
-    return Number(userData);
-  }
-  async getUserChatId(chatId: number): Promise<number | null> {
-    const userData = await this.redisClient.hget(`user:${chatId}`, 'chatId');
-    if (!userData) return null;
-
-    return Number(userData);
-  }
-
-  async getTempToken(chatId: number): Promise<string | null> {
-    return await this.redisClient.hget(`user:${chatId}`, 'tempToken');
   }
 
   async getTempWallet(chatId: number): Promise<string | null> {
@@ -323,6 +293,20 @@ export class RedisService {
     return null;
   }
 
+  async hasKeysWithPattern(pattern: string): Promise<boolean> {
+    let cursor = '0';
+
+    do {
+      const [newCursor, keys] = await this.redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      if (keys.length > 0) {
+        return true;
+      }
+      cursor = newCursor;
+    } while (cursor !== '0');
+
+    return false;
+  }
+
   private filterTokens({ userSession, deleteConditions }: FilterTokensParams): FilterTokensReturnType {
     const { address, network } = deleteConditions;
     const deletedTokens: SessionUserToken[] = [];
@@ -379,20 +363,6 @@ export class RedisService {
     }
 
     await pipe.exec();
-  }
-
-  async hasKeysWithPattern(pattern: string): Promise<boolean> {
-    let cursor = '0';
-
-    do {
-      const [newCursor, keys] = await this.redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-      if (keys.length > 0) {
-        return true;
-      }
-      cursor = newCursor;
-    } while (cursor !== '0');
-
-    return false;
   }
 
   private parseData<T>(data: Record<string, string>): T {
