@@ -11,6 +11,7 @@ export class User {
   @PrimaryGeneratedColumn()
   id: number;
 
+  // TODO: возвращается string
   @Column({ unique: true, type: 'bigint' })
   @IsNumber()
   chatId: number;

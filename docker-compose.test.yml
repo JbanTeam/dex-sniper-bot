@@ -17,12 +17,29 @@ services:
     volumes:
       - pg_TEST_data:/var/lib/postgresql/data
     ports:
-      - ${DB_PORT}:5432
+      - ${DB_PORT}:5431
     networks:
       - TEST_db_network
 
+  test-redis:
+    image: redis:7.4.2-alpine
+    container_name: dex_sniper-test-redis
+    restart: always
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '${REDIS_PORT}:6378'
+    networks:
+      - TEST_db_network
+    volumes:
+      - redis_TEST_data:/data
+
 volumes:
   pg_TEST_data:
+  redis_TEST_data:
 networks:
   TEST_db_network:
     driver: bridge

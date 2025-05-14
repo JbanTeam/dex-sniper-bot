@@ -10,7 +10,7 @@ import { SubscriptionModule } from '@modules/subscription/subscription.module';
 
 @Module({
   imports: [WalletModule, RedisModule, SubscriptionModule],
-  providers: [BlockchainService, ViemProvider, AnvilProvider, ViemHelperProvider],
-  exports: [BlockchainService],
+  providers: [BlockchainService, AnvilProvider, ViemHelperProvider, ViemProvider],
+  exports: [BlockchainService, ViemProvider, AnvilProvider, ViemHelperProvider],
 })
 export class BlockchainModule {}

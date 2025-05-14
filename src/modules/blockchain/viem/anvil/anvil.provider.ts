@@ -1,5 +1,5 @@
 import { anvil } from 'viem/chains';
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import {
   createWalletClient,
   createPublicClient,
@@ -43,7 +43,8 @@ import {
 } from '../types';
 
 @Injectable()
-export class AnvilProvider {
+export class AnvilProvider implements OnModuleInit {
+  // Added OnModuleInit
   private readonly walletClient: WalletClient;
   private readonly publicClient: PublicClient;
   private cachedContracts: CachedContractsType = {} as CachedContractsType;
@@ -67,6 +68,8 @@ export class AnvilProvider {
       transport: http(this.rpcUrl),
     });
   }
+
+  async onModuleInit(): Promise<void> {}
 
   async initTestDex(): Promise<void> {
     const { exchangeAddress } = this.constants.anvilAddresses;

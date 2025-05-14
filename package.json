@@ -17,6 +17,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:integration": "dotenv -e .env.test -- jest --selectProjects Integration --runInBand",
     "test:e2e": "dotenv -e .env.test -- jest --selectProjects E2E --runInBand",
     "db:create": "ts-node -r dotenv/config -r tsconfig-paths/register node_modules/typeorm-extension/dist/cli/index.js db:create -r src/config --synchronize=no --initialDatabase=postgres",
     "db:drop": "ts-node -r dotenv/config -r tsconfig-paths/register node_modules/typeorm-extension/dist/cli/index.js db:drop -r src/config --initialDatabase=postgres",

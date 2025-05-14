@@ -58,7 +58,10 @@ export class ConstantsProvider {
     this.PGADMIN_EMAIL = this.getConfigValue('PGADMIN_EMAIL', 'example@mail.ru');
     this.PGADMIN_PASSWORD = this.getConfigValue('PGADMIN_PASSWORD', 'password');
     this.TELEGRAM_BOT_TOKEN = this.getConfigValue('TELEGRAM_BOT_TOKEN', '');
-    this.ENCRYPT_KEY = this.getConfigValue('ENCRYPT_KEY', 'sekret');
+    this.ENCRYPT_KEY = this.getConfigValue(
+      'ENCRYPT_KEY',
+      '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdee',
+    );
     this.ANVIL_RPC_URL = this.getConfigValue('ANVIL_RPC_URL', 'http://dex_sniper-anvil:8545');
     this.ANVIL_WS_RPC_URL = this.getConfigValue('ANVIL_WS_RPC_URL', 'ws://dex_sniper-anvil:8545');
     this.POLYGON_RPC_URL = this.getConfigValue('POLYGON_RPC_URL', 'https://polygon-rpc.com/');

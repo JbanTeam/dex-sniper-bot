@@ -51,25 +51,22 @@ import {
 export class ViemHelperProvider implements OnModuleInit {
   private readonly logger = new Logger(ViemHelperProvider.name);
   private cachedContracts: CachedContractsType = {} as CachedContractsType;
-  private clients: ViemClientsType;
+  private clients!: ViemClientsType;
 
   constructor(
     private readonly redisService: RedisService,
-    @Inject(forwardRef(() => AnvilProvider))
-    private readonly anvilProvider: AnvilProvider,
     private readonly constants: ConstantsProvider,
     private readonly eventEmitter: EventEmitter2,
-  ) {
+    @Inject(forwardRef(() => AnvilProvider))
+    private readonly anvilProvider: AnvilProvider,
+  ) {}
+
+  async onModuleInit(): Promise<void> {
     if (this.constants.notProd) {
       this.clients = this.anvilProvider.createClients();
+      this.cachedContracts = await this.redisService.getCachedContracts();
     } else {
       this.clients = this.createClients();
-    }
-  }
-
-  async onModuleInit() {
-    if (this.constants.notProd) {
-      this.cachedContracts = await this.redisService.getCachedContracts();
     }
   }
 

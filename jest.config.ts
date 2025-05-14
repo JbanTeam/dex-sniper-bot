@@ -10,7 +10,7 @@ const config = {
   collectCoverageFrom: ['**/*.(t|j)s'],
   testEnvironment: 'node',
   moduleNameMapper: pathsToModuleNameMapper(compilerOptions.paths, { prefix: '<rootDir>/../' }),
-  setupFiles: ['dotenv/config'],
+  // setupFiles: ['dotenv/config'],
 };
 
 export default {
@@ -19,6 +19,13 @@ export default {
       displayName: 'Unit',
       rootDir: 'src',
       testMatch: ['<rootDir>/modules/**/tests/**/*.test.ts'],
+      coverageDirectory: './coverage',
+      ...config,
+    },
+    {
+      displayName: 'Integration',
+      rootDir: 'tests',
+      testMatch: ['<rootDir>/**/*.integration.test.ts'],
       coverageDirectory: './coverage',
       ...config,
     },
