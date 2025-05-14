@@ -127,8 +127,8 @@ describe('SubscriptionService Integration', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    await subscriptionRepository.query('TRUNCATE TABLE "subscription" RESTART IDENTITY CASCADE;');
     await userRepository.query('TRUNCATE TABLE "user" RESTART IDENTITY CASCADE;');
+    await redisService['redisClient'].flushall();
 
     const { user } = await userService.getOrCreateUser(chatId);
     testUser = user!;
@@ -145,7 +145,6 @@ describe('SubscriptionService Integration', () => {
   });
 
   afterAll(async () => {
-    await subscriptionRepository.query('TRUNCATE TABLE "subscription" RESTART IDENTITY CASCADE;');
     await userRepository.query('TRUNCATE TABLE "user" RESTART IDENTITY CASCADE;');
     await redisService['redisClient'].flushall();
     await redisService['redisClient'].quit();

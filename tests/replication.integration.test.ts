@@ -107,8 +107,8 @@ describe('ReplicationService Integration', () => {
   const chatId = 987654321;
   const network = Network.BSC;
   let testUser: User;
-  let testSubscription: Subscription;
-  let testToken: UserToken;
+  let subscription: Subscription;
+  let token: UserToken;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -171,6 +171,7 @@ describe('ReplicationService Integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     await userRepository.query('TRUNCATE TABLE "user" RESTART IDENTITY CASCADE;');
+    await redisService['redisClient'].flushall();
 
     const { user } = await userService.getOrCreateUser(chatId);
     testUser = user!;
@@ -200,8 +201,8 @@ describe('ReplicationService Integration', () => {
       network,
     });
 
-    testSubscription = (await subscriptionRepository.findOne({ where: { address: mockSubAddress } })) as Subscription;
-    testToken = (await userTokenRepository.findOne({ where: { address: mockTokenAddress } })) as UserToken;
+    subscription = (await subscriptionRepository.findOne({ where: { address: mockSubAddress } })) as Subscription;
+    token = (await userTokenRepository.findOne({ where: { address: mockTokenAddress } })) as UserToken;
   });
 
   afterAll(async () => {
@@ -217,8 +218,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 100,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -230,7 +231,7 @@ describe('ReplicationService Integration', () => {
       const exchangeName = constantsProvider.chains[network].exchange;
       expect(result).toContain(`<u>${exchangeName} (${network}):</u>`);
       expect(result).toContain(`<b>1. 💰 Кошелек:</b> <code>${mockSubAddress}</code>`);
-      expect(result).toContain(`<b>${testToken.symbol}:</b> <code>${mockTokenAddress}</code>`);
+      expect(result).toContain(`<b>${token.symbol}:</b> <code>${mockTokenAddress}</code>`);
       expect(result).toContain('<b>Лимиты:</b> покупка - 100; продажа - 0');
     });
 
@@ -247,8 +248,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 150,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -263,8 +264,8 @@ describe('ReplicationService Integration', () => {
       expect(replicationsInDb[0].buy).toBe(150);
       expect(replicationsInDb[0].sell).toBe(0);
       expect(replicationsInDb[0].network).toBe(network);
-      expect(replicationsInDb[0].token.id).toBe(testToken.id);
-      expect(replicationsInDb[0].subscription.id).toBe(testSubscription.id);
+      expect(replicationsInDb[0].token.id).toBe(token.id);
+      expect(replicationsInDb[0].subscription.id).toBe(subscription.id);
 
       const userSession = await redisService.getUser(chatId);
       expect(userSession.replications).toHaveLength(1);
@@ -275,7 +276,7 @@ describe('ReplicationService Integration', () => {
       expect(sessionRep.subscriptionAddress).toBe(mockSubAddress);
 
       expect(resultMessage).toContain(`<u>Кошелек:</u> <b>${network}</b> <code>${mockSubAddress}</code>`);
-      expect(resultMessage).toContain(`<u>Токен:</u> <b>${testToken.name} (${testToken.symbol})</b>`);
+      expect(resultMessage).toContain(`<u>Токен:</u> <b>${token.name} (${token.symbol})</b>`);
       expect(resultMessage).toContain('<u>Лимит на покупку:</u> <b>150</b>');
       expect(resultMessage).toContain('<u>Лимит на продажу:</u> <b>0</b>');
     });
@@ -285,8 +286,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 100,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -296,8 +297,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 250,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -322,8 +323,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 100,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -333,8 +334,8 @@ describe('ReplicationService Integration', () => {
         action: 'sell',
         limit: 300,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -359,8 +360,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 100,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
       };
       await expect(replicationService.createOrUpdateReplication(tempReplication)).rejects.toThrow(
         new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400),
@@ -374,12 +375,12 @@ describe('ReplicationService Integration', () => {
       const userSessionBefore = await redisService.getUser(chatId);
       userSessionBefore.testTokens = [
         {
-          id: testToken.id,
+          id: token.id,
           address: mockTestTokenAddress,
-          network: testToken.network,
+          network: token.network,
           name: 'Test Token (Test Version)',
           symbol: 'TTK-T',
-          decimals: testToken.decimals,
+          decimals: token.decimals,
         },
       ];
       await redisService.addUser(userSessionBefore);
@@ -388,8 +389,8 @@ describe('ReplicationService Integration', () => {
         action: 'buy',
         limit: 175,
         network,
-        subscriptionId: testSubscription.id,
-        tokenId: testToken.id,
+        subscriptionId: subscription.id,
+        tokenId: token.id,
         chatId,
         userId: testUser.id,
       };
@@ -408,7 +409,7 @@ describe('ReplicationService Integration', () => {
       expect(sessionRep.tokenAddress).toBe(mockTokenAddress);
       expect(sessionRep.subscriptionAddress).toBe(mockSubAddress);
 
-      expect(resultMessage).toContain(`<u>Токен:</u> <b>${testToken.name} (${testToken.symbol})</b>`);
+      expect(resultMessage).toContain(`<u>Токен:</u> <b>${token.name} (${token.symbol})</b>`);
       expect(resultMessage).toContain('<u>Лимит на покупку:</u> <b>175</b>');
 
       Object.defineProperty(constantsProvider, 'notProd', { value: true, configurable: true });

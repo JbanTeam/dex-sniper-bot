@@ -123,8 +123,8 @@ describe('WalletService Integration', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    await walletRepository.query('TRUNCATE TABLE "wallet" RESTART IDENTITY CASCADE;');
     await userRepository.query('TRUNCATE TABLE "user" RESTART IDENTITY CASCADE;');
+    await redisService['redisClient'].flushall();
 
     const { user } = await userService.getOrCreateUser(chatId);
     testUser = user!;
@@ -141,7 +141,6 @@ describe('WalletService Integration', () => {
   });
 
   afterAll(async () => {
-    await walletRepository.query('TRUNCATE TABLE "wallet" RESTART IDENTITY CASCADE;');
     await userRepository.query('TRUNCATE TABLE "user" RESTART IDENTITY CASCADE;');
     await redisService['redisClient'].flushall();
     await redisService['redisClient'].quit();
