@@ -21,9 +21,9 @@ export class SubscriptionService {
   async subscribeToWallet({ chatId, address, network }: SubscribeToWalletParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
 
-    const existingSubscription = userSession.subscriptions.find(s => s.address === address);
+    const existingSubscription = userSession.subscriptions.find(s => s.address.toLowerCase() === address.toLowerCase());
     if (existingSubscription) throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400);
-    const isSubscribeOnOwnWallet = userSession.wallets.find(w => w.address.toLowerCase() === address);
+    const isSubscribeOnOwnWallet = userSession.wallets.find(w => w.address.toLowerCase() === address.toLowerCase());
     if (isSubscribeOnOwnWallet) {
       throw new BotError('Subscribing on own wallet', 'Вы не можете подписаться на свой кошелек', 400);
     }
@@ -54,7 +54,9 @@ export class SubscriptionService {
       throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
     }
 
-    const sessionSubscription = userSession.subscriptions.find(sub => sub.address === walletAddress);
+    const sessionSubscription = userSession.subscriptions.find(
+      sub => sub.address.toLowerCase() === walletAddress.toLowerCase(),
+    );
     if (!sessionSubscription) {
       throw new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400);
     }

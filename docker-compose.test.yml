@@ -17,7 +17,7 @@ services:
     volumes:
       - pg_TEST_data:/var/lib/postgresql/data
     ports:
-      - ${DB_PORT}:5431
+      - ${DB_PORT}:5432
     networks:
       - TEST_db_network
 
@@ -31,7 +31,7 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - '${REDIS_PORT}:6378'
+      - '${REDIS_PORT}:6379'
     networks:
       - TEST_db_network
     volumes:

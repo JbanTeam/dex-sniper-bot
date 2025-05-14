@@ -63,7 +63,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     if (this.constants.notProd) await this.viemHelper.initAnvil();
 
     this.unwatchCallbacks = this.viemHelper.initUnwatchCallbacks();
-    console.log('🚀 Viem provider started', this.unwatchCallbacks);
 
     const networkKeys = Object.keys(ViemNetwork);
 
@@ -175,7 +174,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
   @OnEvent('monitorDex')
   async monitorDex({ network }: { network: Network }): Promise<void> {
-    console.log('network', network);
     this.unwatchCallbacks[network]();
     const client = this.clients.publicWebsocket[network];
 

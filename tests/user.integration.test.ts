@@ -110,8 +110,6 @@ describe('UserService Integration', () => {
     viemProvider.monitorDex = jest.fn().mockResolvedValue(undefined);
     viemProvider.onModuleInit = jest.fn().mockResolvedValue(undefined);
 
-    console.log('viemPRovider', viemProvider);
-
     app = module.createNestApplication();
     await app.init();
   });
@@ -126,37 +124,56 @@ describe('UserService Integration', () => {
     await app.close();
   });
 
-  it('should create a new user and wallets if user does not exist', async () => {
-    const chatId: number = 123456789;
+  describe('getOrCreateUser', () => {
+    it('should create a new user and wallets if user does not exist', async () => {
+      const chatId: number = 123456789;
 
-    const spyCreateWallet = jest.spyOn(viemProvider, 'createWallet');
+      const spyCreateWallet = jest.spyOn(viemProvider, 'createWallet');
 
-    const result = await userService.getOrCreateUser(chatId);
+      const result = await userService.getOrCreateUser(chatId);
 
-    expect(result.action).toBe('create');
-    expect(result.user).toBeDefined();
-    expect(result.user?.chatId).toBe(`${chatId}`);
+      expect(result.action).toBe('create');
+      expect(result.user).toBeDefined();
+      expect(result.user?.chatId).toBe(`${chatId}`);
 
-    const expectedNetworkCount = Object.keys(Network).length;
-    expect(spyCreateWallet).toHaveBeenCalledTimes(expectedNetworkCount);
-    Object.values(Network).forEach(network => {
-      expect(spyCreateWallet).toHaveBeenCalledWith(network);
+      const expectedNetworkCount = Object.keys(Network).length;
+      expect(spyCreateWallet).toHaveBeenCalledTimes(expectedNetworkCount);
+      Object.values(Network).forEach(network => {
+        expect(spyCreateWallet).toHaveBeenCalledWith(network);
+      });
+    });
+
+    it('should return existing user if already registered', async () => {
+      const chatId = 987654321;
+
+      const spyCreateWallet = jest.spyOn(viemProvider, 'createWallet');
+
+      await userService.getOrCreateUser(chatId);
+      const expectedNetworkCountOnCreation = Object.keys(Network).length;
+      expect(spyCreateWallet).toHaveBeenCalledTimes(expectedNetworkCountOnCreation);
+
+      const result = await userService.getOrCreateUser(chatId);
+
+      expect(result.action).toBe('get');
+      expect(result.user).toBeDefined();
+      expect(result.user?.chatId).toBe(`${chatId}`);
     });
   });
 
-  it('should return existing user if already registered', async () => {
-    const chatId = 987654321;
+  describe('findById', () => {
+    it('should return a user if found by ID', async () => {
+      const chatId = 987654321;
+      await userService.getOrCreateUser(chatId);
 
-    const spyCreateWallet = jest.spyOn(viemProvider, 'createWallet');
+      const result = await userService.findById({ id: 1 });
+      expect(result).not.toBeNull();
+      expect(result?.id).toBe(1);
+    });
 
-    await userService.getOrCreateUser(chatId);
-    const expectedNetworkCountOnCreation = Object.keys(Network).length;
-    expect(spyCreateWallet).toHaveBeenCalledTimes(expectedNetworkCountOnCreation);
+    it('should return null if user not found by ID', async () => {
+      const result = await userService.findById({ id: 100 });
 
-    const result = await userService.getOrCreateUser(chatId);
-
-    expect(result.action).toBe('get');
-    expect(result.user).toBeDefined();
-    expect(result.user?.chatId).toBe(`${chatId}`);
+      expect(result).toBeNull();
+    });
   });
 });
