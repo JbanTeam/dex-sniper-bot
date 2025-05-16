@@ -261,10 +261,10 @@ describe('UserTokenService Integration', () => {
 
   describe('getTokens', () => {
     it('should return formatted tokens list', async () => {
-      const userSessionBefore = await redisService.getUser(chatId);
+      const userSession = await redisService.getUser(chatId);
 
       await userTokenService.addToken({
-        userSession: userSessionBefore,
+        userSession,
         address: mockTokenAddress,
         network,
       });
@@ -281,31 +281,26 @@ describe('UserTokenService Integration', () => {
     });
   });
 
-  // describe('removeToken', () => {
-  //   it('should remove token by address', async () => {
-  //     await userTokenService.addToken({
-  //       userSession: {
-  //         userId: testUser.id,
-  //         chatId,
-  //         tokens: [],
-  //         wallets: [{ network, address: '0xWalletAddress' }],
-  //         subscriptions: [],
-  //         replications: [],
-  //       },
-  //       address: mockTokenAddress,
-  //       network,
-  //     });
+  describe('removeToken', () => {
+    it('should remove token by address', async () => {
+      const userSession = await redisService.getUser(chatId);
 
-  //     await userTokenService.removeToken({ chatId, address: mockTokenAddress });
+      await userTokenService.addToken({
+        userSession,
+        address: mockTokenAddress,
+        network,
+      });
 
-  //     const tokens = await userTokenRepository.find();
-  //     expect(tokens.length).toBe(0);
-  //   });
+      await userTokenService.removeToken({ chatId, address: mockTokenAddress });
 
-  //   it('should throw error when token not found', async () => {
-  //     await expect(userTokenService.removeToken({ chatId, address: mockTokenAddress })).rejects.toThrow(
-  //       new BotError('Token not found', 'Токен не найден', 404),
-  //     );
-  //   });
-  // });
+      const tokens = await userTokenRepository.find();
+      expect(tokens.length).toBe(0);
+    });
+
+    it('should throw error when token not found', async () => {
+      await expect(userTokenService.removeToken({ chatId, address: mockTokenAddress })).rejects.toThrow(
+        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404),
+      );
+    });
+  });
 });
