@@ -99,8 +99,6 @@ describe('BlockchainService Integration', () => {
     })
       .overrideProvider(AnvilProvider)
       .useValue(mockAnvilProvider)
-      // .overrideProvider(ViemHelperProvider)
-      // .useValue(mockViemHelperProvider)
       .compile();
 
     blockchainService = module.get<BlockchainService>(BlockchainService);
@@ -115,8 +113,6 @@ describe('BlockchainService Integration', () => {
 
     viemHelper.initAnvil = jest.fn().mockResolvedValue(undefined);
     viemHelper.getClients = jest.fn().mockReturnValue(mockClients);
-    // mockViemHelperProvider.initAnvil.mockResolvedValue(undefined);
-    // mockViemHelperProvider.initUnwatchCallbacks.mockReturnValue(mockUnwatchCallbacks);
     mockAnvilProvider.setTestBalance.mockResolvedValue(undefined);
     mockAnvilProvider.createTestToken.mockResolvedValue({
       token: mockTestToken,
@@ -124,10 +120,6 @@ describe('BlockchainService Integration', () => {
     });
     viemProvider.monitorDex = jest.fn().mockResolvedValue(undefined);
     viemProvider.onModuleInit = jest.fn().mockResolvedValue(undefined);
-    // viemProvider.checkToken = jest.fn().mockResolvedValue({
-    //   ...tokenParams,
-    //   pairAddresses: mockPairAddresses,
-    // });
 
     mockClients = Object.keys(ViemNetwork).reduce(
       (clients, keyNetwork) => {
@@ -233,7 +225,6 @@ describe('BlockchainService Integration', () => {
   describe('getBalance', () => {
     it('should get balance successfully', async () => {
       const spyGetBalance = jest.spyOn(viemProvider, 'getBalance');
-      // viemProvider.getBalance = jest.fn().mockResolvedValue(mockBalance);
 
       const userSession = await redisService.getUser(chatId);
       const wallet = await blockchainService.createWallet({
