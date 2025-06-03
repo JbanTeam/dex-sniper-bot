@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { IncomingMessage } from '@src/types/types';
@@ -75,7 +75,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
     try {
       const userExists = await this.redisService.existsInSet('users', message.chatId.toString());
-      if (!userExists) throw new BotError('User not found', 'Пользователь не найден', 404);
+      if (!userExists) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
 
@@ -105,7 +105,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const userSession = await this.redisService.getUser(message.chatId);
 
       if (!userSession.tokens?.length) {
-        throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404);
+        throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND);
       }
 
       if (tokenAddress) {
@@ -215,7 +215,11 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const [, action, limit] = message.text.split(' ');
 
       if (!strIsPositiveNumber(limit)) {
-        throw new BotError('Enter correct command', 'Введите корректную команду. Пример: /replicate buy 100', 400);
+        throw new BotError(
+          'Enter correct command',
+          'Введите корректную команду. Пример: /replicate buy 100',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       isBuySell(action);
@@ -223,11 +227,11 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const userSession = await this.redisService.getUser(message.chatId);
 
       if (!userSession.subscriptions?.length) {
-        throw new BotError('You have no subscriptions', 'У вас нет подписок на кошельки', 404);
+        throw new BotError('You have no subscriptions', 'У вас нет подписок на кошельки', HttpStatus.NOT_FOUND);
       }
 
       if (!userSession.tokens.length) {
-        throw new BotError('You have no tokens', 'Сначала добавьте токены', 404);
+        throw new BotError('You have no tokens', 'Сначала добавьте токены', HttpStatus.NOT_FOUND);
       }
 
       await this.redisService.setUserField(
@@ -281,7 +285,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
     try {
       const parts = message.text.split(' ');
       if (parts.length !== 3 && parts.length !== 4) {
-        throw new BotError('Invalid format', 'Неверный формат команды', 400);
+        throw new BotError('Invalid format', 'Неверный формат команды', HttpStatus.BAD_REQUEST);
       }
 
       let tokenAddress: string | null = null;
@@ -298,7 +302,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       isEtherAddress(recipientAddress, 'Введите корректный адрес получателя');
 
       if (!strIsPositiveNumber(amount)) {
-        throw new BotError('Enter correct amount', 'Введите корректную сумму', 400);
+        throw new BotError('Enter correct amount', 'Введите корректную сумму', HttpStatus.BAD_REQUEST);
       }
 
       await this.redisService.setUserField(
@@ -340,11 +344,15 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const testTokens = await this.redisService.getTokens(message.chatId, 'testTokens');
 
       if (!testTokens?.length) {
-        throw new BotError('You have no tokens', 'У вас нет токенов, чтобы отправить транзакцию', 400);
+        throw new BotError(
+          'You have no tokens',
+          'У вас нет токенов, чтобы отправить транзакцию',
+          HttpStatus.BAD_REQUEST,
+        );
       }
       const testToken = testTokens[0];
 
-      if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
+      if (!testToken) throw new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND);
       await this.blockchainService.fakeSwapTo(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
@@ -362,11 +370,15 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       const testTokens = await this.redisService.getTokens(message.chatId, 'testTokens');
 
       if (!testTokens?.length) {
-        throw new BotError('You have no tokens', 'У вас нет токенов, чтобы отправить транзакцию', 400);
+        throw new BotError(
+          'You have no tokens',
+          'У вас нет токенов, чтобы отправить транзакцию',
+          HttpStatus.BAD_REQUEST,
+        );
       }
       const testToken = testTokens[0];
 
-      if (!testToken) throw new BotError('Token not found', 'Токен не найден', 404);
+      if (!testToken) throw new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND);
       await this.blockchainService.fakeSwapFrom(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };

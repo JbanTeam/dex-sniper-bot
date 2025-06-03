@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 import {
   Network,
@@ -160,7 +160,7 @@ export class RedisService {
 
   async getUser(chatId: number): Promise<SessionUser> {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
-    if (!userData) throw new BotError('User not found', 'Пользователь не найден', 404);
+    if (!userData) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
     return this.parseData<SessionUser>(userData);
   }
@@ -181,7 +181,7 @@ export class RedisService {
   async getTempReplication(chatId: number): Promise<TempReplication> {
     const tempReplicationData = await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
     if (!tempReplicationData)
-      throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', 404);
+      throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', HttpStatus.NOT_FOUND);
     return this.parseData<TempReplication>(JSON.parse(tempReplicationData));
   }
 

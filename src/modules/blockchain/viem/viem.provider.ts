@@ -1,5 +1,5 @@
 import { OnEvent } from '@nestjs/event-emitter';
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   ContractFunctionExecutionError,
@@ -121,10 +121,10 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `This token does not exist in the network ${network}`,
           `Этого токена не существует в сети ${network}`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
-      throw new BotError(`Error checking token`, `Ошибка проверки токена`, 400);
+      throw new BotError(`Error checking token`, `Ошибка проверки токена`, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -240,7 +240,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -252,7 +252,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Not enough tokens ${token.symbol} on balance: ${tokenBalance}`,
           `Недостаточное количество токенов <u>${token.symbol}</u> на балансе: ${tokenBalance}`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -262,7 +262,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
       throw error;
@@ -283,7 +283,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -293,7 +293,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
       throw error;
@@ -340,7 +340,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
           throw new BotError(
             `Top up balance ${currency} for transaction`,
             `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-            400,
+            HttpStatus.BAD_REQUEST,
           );
         }
         throw error;
@@ -394,7 +394,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       reply += `<b>Баланс ${currencyIn}:</b> ${formattedBalance}\n`;
       reply += `<b>Требуемая сумма:</b> ${formattedAmountIn}\n`;
       reply += `<b>Подписка:</b> ${exchange} <code>${tx.sender}</code>\n`;
-      throw new BotError(`Not enough balance ${currencyIn}`, reply, 400);
+      throw new BotError(`Not enough balance ${currencyIn}`, reply, HttpStatus.BAD_REQUEST);
     }
 
     if (!inIsNative) {
@@ -432,7 +432,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       throw new BotError(
         `Wallet for network ${network} not found`,
         `Кошелек для сети <u>${network}</u> не найден`,
-        400,
+        HttpStatus.BAD_REQUEST,
       );
     }
 

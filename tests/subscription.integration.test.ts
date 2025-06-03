@@ -2,7 +2,7 @@ import * as path from 'path';
 import { PublicClient } from 'viem';
 import { Repository } from 'typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { INestApplication } from '@nestjs/common';
+import { HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 
@@ -167,7 +167,7 @@ describe('SubscriptionService Integration', () => {
       await subscriptionService.subscribeToWallet({ chatId, address: mockSubAddress, network });
 
       await expect(subscriptionService.subscribeToWallet({ chatId, address: mockSubAddress, network })).rejects.toThrow(
-        new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400),
+        new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', HttpStatus.BAD_REQUEST),
       );
     });
 
@@ -176,7 +176,9 @@ describe('SubscriptionService Integration', () => {
 
       await expect(
         subscriptionService.subscribeToWallet({ chatId, address: ownWalletAddress!, network }),
-      ).rejects.toThrow(new BotError('Subscribing on own wallet', 'Вы не можете подписаться на свой кошелек', 400));
+      ).rejects.toThrow(
+        new BotError('Subscribing on own wallet', 'Вы не можете подписаться на свой кошелек', HttpStatus.BAD_REQUEST),
+      );
     });
   });
 
@@ -196,7 +198,9 @@ describe('SubscriptionService Integration', () => {
     it('should throw BotError if user has no subscriptions', async () => {
       await expect(
         subscriptionService.unsubscribeFromWallet({ chatId, walletAddress: mockSubAddress }),
-      ).rejects.toThrow(new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404));
+      ).rejects.toThrow(
+        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND),
+      );
     });
 
     it('should throw BotError if not subscribed to the specific wallet', async () => {
@@ -204,7 +208,13 @@ describe('SubscriptionService Integration', () => {
 
       await expect(
         subscriptionService.unsubscribeFromWallet({ chatId, walletAddress: (mockSubAddress + 'r') as Address }),
-      ).rejects.toThrow(new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400));
+      ).rejects.toThrow(
+        new BotError(
+          'You are not subscribed on this wallet',
+          'Вы не подписаны на этот кошелек',
+          HttpStatus.BAD_REQUEST,
+        ),
+      );
     });
   });
 
@@ -221,7 +231,7 @@ describe('SubscriptionService Integration', () => {
 
     it('should throw BotError if no subscriptions found in Redis', async () => {
       await expect(subscriptionService.getSubscriptions(chatId)).rejects.toThrow(
-        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404),
+        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND),
       );
     });
   });

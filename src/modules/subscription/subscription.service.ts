@@ -1,6 +1,6 @@
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -22,10 +22,15 @@ export class SubscriptionService {
     const userSession = await this.redisService.getUser(chatId);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address.toLowerCase() === address.toLowerCase());
-    if (existingSubscription) throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400);
+    if (existingSubscription)
+      throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', HttpStatus.BAD_REQUEST);
     const isSubscribeOnOwnWallet = userSession.wallets.find(w => w.address.toLowerCase() === address.toLowerCase());
     if (isSubscribeOnOwnWallet) {
-      throw new BotError('Subscribing on own wallet', 'Вы не можете подписаться на свой кошелек', 400);
+      throw new BotError(
+        'Subscribing on own wallet',
+        'Вы не можете подписаться на свой кошелек',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const subscription = this.subscriptionRepository.create({
@@ -51,24 +56,29 @@ export class SubscriptionService {
     const userSession = await this.redisService.getUser(chatId);
 
     if (!userSession.subscriptions?.length) {
-      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
+      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND);
     }
 
     const sessionSubscription = userSession.subscriptions.find(
       sub => sub.address.toLowerCase() === walletAddress.toLowerCase(),
     );
     if (!sessionSubscription) {
-      throw new BotError('You are not subscribed on this wallet', 'Вы не подписаны на этот кошелек', 400);
+      throw new BotError(
+        'You are not subscribed on this wallet',
+        'Вы не подписаны на этот кошелек',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const subscription = await this.subscriptionRepository.findOne({
       where: { id: sessionSubscription.id },
     });
 
-    if (!subscription) throw new BotError('Subscription not found', 'Подписка не найдена', 404);
+    if (!subscription) throw new BotError('Subscription not found', 'Подписка не найдена', HttpStatus.NOT_FOUND);
     const deleted = await this.subscriptionRepository.delete({ id: subscription.id });
 
-    if (!deleted.affected) throw new BotError('Error unsubscribing from wallet', 'Ошибка при отписке от кошелька', 400);
+    if (!deleted.affected)
+      throw new BotError('Error unsubscribing from wallet', 'Ошибка при отписке от кошелька', HttpStatus.BAD_REQUEST);
 
     await this.redisService.removeSubscription({
       chatId,
@@ -82,7 +92,7 @@ export class SubscriptionService {
     const subscriptions = await this.redisService.getSubscriptions(chatId);
 
     if (!subscriptions?.length) {
-      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404);
+      throw new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND);
     }
 
     const groupedSubscriptions = subscriptions.reduce(

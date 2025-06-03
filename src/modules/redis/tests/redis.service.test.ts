@@ -6,6 +6,7 @@ import { RedisService } from '../redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SessionUser, Address } from '@src/types/types';
 import { AddTokenParams, SubscriptionParams, AddPairParams, RemoveTokenParams, GetPairParams } from '../types';
+import { HttpStatus } from '@nestjs/common';
 
 const mockConstantsProvider = {
   REDIS_HOST: 'localhost',
@@ -204,7 +205,7 @@ describe('RedisService', () => {
   it('should throw error if user not found in getUser', async () => {
     redisClient.hgetall = jest.fn().mockResolvedValue(null as unknown as Record<string, string>);
     await expect(redisService.getUser(123)).rejects.toThrow(
-      new BotError('User not found', 'Пользователь не найден', 404),
+      new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND),
     );
   });
 
@@ -244,7 +245,7 @@ describe('RedisService', () => {
   it('should throw error if temp replication not found', async () => {
     redisClient.hget = jest.fn().mockResolvedValue(null);
     await expect(redisService.getTempReplication(123)).rejects.toThrow(
-      new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', 404),
+      new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', HttpStatus.NOT_FOUND),
     );
   });
 

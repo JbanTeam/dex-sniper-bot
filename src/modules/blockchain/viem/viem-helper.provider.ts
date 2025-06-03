@@ -1,7 +1,7 @@
 import { anvil } from 'viem/chains';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { privateKeyToAccount } from 'viem/accounts';
-import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { forwardRef, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   Account,
   Chain,
@@ -270,7 +270,7 @@ export class ViemHelperProvider implements OnModuleInit {
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`Tokens not sent ❌`, `🚫 Ошибка отправки токенов`, 400);
+      throw new BotError(`Tokens not sent ❌`, `🚫 Ошибка отправки токенов`, HttpStatus.BAD_REQUEST);
     }
 
     console.log('✅ Токены отправлены', receipt);
@@ -294,7 +294,7 @@ export class ViemHelperProvider implements OnModuleInit {
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`${currency} not sent ❌`, `🚫 Ошибка отправки ${currency}`, 400);
+      throw new BotError(`${currency} not sent ❌`, `🚫 Ошибка отправки ${currency}`, HttpStatus.BAD_REQUEST);
     }
 
     console.log(`✅ ${currency} отправлены`, receipt);
@@ -388,7 +388,7 @@ export class ViemHelperProvider implements OnModuleInit {
     });
 
     if (pairAddress === '0x0000000000000000000000000000000000000000') {
-      throw new BotError('Pair does not exist', 'Пара не существует', 400);
+      throw new BotError('Pair does not exist', 'Пара не существует', HttpStatus.BAD_REQUEST);
     }
 
     const [token0, token1] = await Promise.all([

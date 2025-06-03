@@ -1,6 +1,7 @@
 import * as crypto from 'crypto';
 import { BotError } from '@src/errors/BotError';
 import { ENCRYPT_ALGORITHM, ENCRYPTED_IV_LENGTH, ENCRYPTED_KEY_LENGTH } from './constants';
+import { HttpStatus } from '@nestjs/common';
 
 type Hex = `0x${string}`;
 
@@ -12,7 +13,7 @@ const encryptPrivateKey = ({ privateKey, encryptKey }: { privateKey: string; enc
     throw new BotError(
       'Invalid key length. Key must be 32 bytes (256 bits) in hex format',
       'Ошибка получения ключа',
-      400,
+      HttpStatus.BAD_REQUEST,
     );
   }
 
@@ -34,7 +35,7 @@ const decryptPrivateKey = ({
   const [ivHex, encryptedHex, authTagHex] = encryptedPrivateKey.split(':');
 
   if (!ivHex || !encryptedHex || !authTagHex) {
-    throw new BotError('Invalid encrypted string format', 'Ошибка получения ключа', 400);
+    throw new BotError('Invalid encrypted string format', 'Ошибка получения ключа', HttpStatus.BAD_REQUEST);
   }
 
   const key = Buffer.from(encryptKey, 'hex');
@@ -45,7 +46,7 @@ const decryptPrivateKey = ({
     throw new BotError(
       'Invalid key length. Key must be 32 bytes (256 bits) in hex format',
       'Ошибка получения ключа',
-      400,
+      HttpStatus.BAD_REQUEST,
     );
   }
 

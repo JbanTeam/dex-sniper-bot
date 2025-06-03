@@ -16,6 +16,7 @@ import {
   SessionWallet,
   TempReplication,
 } from '@src/types/types';
+import { HttpStatus } from '@nestjs/common';
 
 const mockSessionReplication = {
   id: 1,
@@ -125,7 +126,7 @@ describe('ReplicationService', () => {
       mockRedisService.getReplications = jest.fn().mockResolvedValue([]);
 
       await expect(replicationService.getReplications(123)).rejects.toThrow(
-        new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', 404),
+        new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', HttpStatus.NOT_FOUND),
       );
     });
   });
@@ -180,7 +181,7 @@ describe('ReplicationService', () => {
       };
 
       await expect(replicationService.createOrUpdateReplication(tempReplication)).rejects.toThrow(
-        new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400),
+        new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST),
       );
     });
   });

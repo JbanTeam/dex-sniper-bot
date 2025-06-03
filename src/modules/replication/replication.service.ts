@@ -1,5 +1,5 @@
 import { Repository } from 'typeorm';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Replication } from './replication.entity';
@@ -22,7 +22,7 @@ export class ReplicationService {
     const replicatons = await this.redisService.getReplications(chatId);
 
     if (!replicatons?.length) {
-      throw new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', 404);
+      throw new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', HttpStatus.NOT_FOUND);
     }
 
     const groupedReplications = replicatons.reduce(
@@ -55,7 +55,11 @@ export class ReplicationService {
   async createOrUpdateReplication(tempReplication: TempReplication): Promise<string> {
     const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
     if (!chatId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
+      throw new BotError(
+        'Invalid data in tempReplication',
+        'Не удалось установить повтор сделок',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const userSession = await this.redisService.getUser(chatId);
 
@@ -74,7 +78,11 @@ export class ReplicationService {
   private async createReplication(tempReplication: TempReplication, userSession: SessionUser): Promise<string> {
     const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
+      throw new BotError(
+        'Invalid data in tempReplication',
+        'Не удалось установить повтор сделок',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const replicationData = {
@@ -93,7 +101,7 @@ export class ReplicationService {
     });
 
     if (!fullReplication) {
-      throw new BotError('Replication not found', 'Не удалось установить повтор сделок', 404);
+      throw new BotError('Replication not found', 'Не удалось установить повтор сделок', HttpStatus.NOT_FOUND);
     }
 
     let tokenAddress = fullReplication.token.address;
@@ -131,7 +139,11 @@ export class ReplicationService {
   }: PrepareSessionReplication): SessionReplication {
     const { subscriptionId, tokenId, chatId, userId } = tempReplication;
     if (!chatId || !userId || !subscriptionId || !tokenId) {
-      throw new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400);
+      throw new BotError(
+        'Invalid data in tempReplication',
+        'Не удалось установить повтор сделок',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const sessionReplication = {
       ...replication,
@@ -159,7 +171,7 @@ export class ReplicationService {
     const { buy, sell, chatId } = existingReplication;
     const updatedReplication = await this.replicationRepository.update(existingReplication.id, { buy, sell });
     if (!updatedReplication.affected) {
-      throw new BotError('Error updating replication', 'Не удалось установить повтор сделок', 400);
+      throw new BotError('Error updating replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
     }
 
     userSession.replications = userSession.replications.filter(r => r.id !== existingReplication.id);

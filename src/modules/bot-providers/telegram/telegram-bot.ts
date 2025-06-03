@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { tgCommands } from '@src/utils/constants';
@@ -130,7 +130,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       const response = await axios.post(url, body);
 
       if (!response.data.ok) {
-        throw new BotError('Failed to set commands', 'Не удалось установить команды', 400);
+        throw new BotError('Failed to set commands', 'Не удалось установить команды', HttpStatus.BAD_REQUEST);
       }
 
       console.log('Commands set successfully:', response.data);
@@ -172,7 +172,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
       const { user, action } = await this.userService.getOrCreateUser(chatId);
 
-      if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
+      if (!user) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
       await this.redisService.addUser({
         chatId,
@@ -218,7 +218,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         chatId: update.message?.chat.id || 0,
       };
     } else {
-      throw new BotError('Unknown update type', 'Ошибка при обработке обновления', 400);
+      throw new BotError('Unknown update type', 'Ошибка при обработке обновления', HttpStatus.BAD_REQUEST);
     }
   }
 

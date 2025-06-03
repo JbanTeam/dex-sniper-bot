@@ -1,5 +1,5 @@
 import { anvil } from 'viem/chains';
-import { forwardRef, Inject, Injectable, OnModuleInit } from '@nestjs/common';
+import { forwardRef, HttpStatus, Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import {
   createWalletClient,
   createPublicClient,
@@ -247,7 +247,7 @@ export class AnvilProvider implements OnModuleInit {
       });
     } catch (error) {
       console.error(error);
-      throw new BotError(`Error setting balance`, `Ошибка установления баланса`, 400);
+      throw new BotError(`Error setting balance`, `Ошибка установления баланса`, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -303,7 +303,7 @@ export class AnvilProvider implements OnModuleInit {
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`Test tokens not sent ❌`, `Тестовый токены не были отправлены ❌`, 400);
+      throw new BotError(`Test tokens not sent ❌`, `Тестовый токены не были отправлены ❌`, HttpStatus.BAD_REQUEST);
     }
 
     console.log('✅ Токены отправлены', receipt);
@@ -319,7 +319,7 @@ export class AnvilProvider implements OnModuleInit {
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     if (!receipt.contractAddress) {
-      throw new BotError(`WBNB not created ❌`, `WBNB не был создан ❌`, 400);
+      throw new BotError(`WBNB not created ❌`, `WBNB не был создан ❌`, HttpStatus.BAD_REQUEST);
     }
     this.cachedContracts.nativeToken = receipt.contractAddress.toLowerCase() as Address;
 
@@ -341,7 +341,11 @@ export class AnvilProvider implements OnModuleInit {
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash: txHash });
 
     if (!receipt.contractAddress) {
-      throw new BotError(`Test contract ${name} not created ❌`, `Тестовый контракт ${name} не был создан ❌`, 400);
+      throw new BotError(
+        `Test contract ${name} not created ❌`,
+        `Тестовый контракт ${name} не был создан ❌`,
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const tokenAddress = receipt.contractAddress.toLowerCase() as Address;
@@ -374,7 +378,7 @@ export class AnvilProvider implements OnModuleInit {
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     if (!receipt.contractAddress) {
-      throw new BotError(`Factory not created ❌`, `Factory не был создан ❌`, 400);
+      throw new BotError(`Factory not created ❌`, `Factory не был создан ❌`, HttpStatus.BAD_REQUEST);
     }
     this.cachedContracts.factoryAddress = receipt.contractAddress.toLowerCase() as Address;
   }
@@ -390,7 +394,7 @@ export class AnvilProvider implements OnModuleInit {
     });
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
     if (!receipt.contractAddress) {
-      throw new BotError(`Router not created ❌`, `Router не был создан ❌`, 400);
+      throw new BotError(`Router not created ❌`, `Router не был создан ❌`, HttpStatus.BAD_REQUEST);
     }
     this.cachedContracts.routerAddress = receipt.contractAddress.toLowerCase() as Address;
 
@@ -431,7 +435,7 @@ export class AnvilProvider implements OnModuleInit {
       args = [amountIn, minAmountOut, path, recipientAddress, deadline];
       value = undefined;
     } else {
-      throw new BotError(`Unsupported function`, `Неизвестная функция свапа`, 400);
+      throw new BotError(`Unsupported function`, `Неизвестная функция свапа`, HttpStatus.BAD_REQUEST);
     }
     try {
       const hash = await this.walletClient.writeContract({
@@ -446,7 +450,7 @@ export class AnvilProvider implements OnModuleInit {
 
       const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== 'success') {
-        throw new BotError(`Swap not done ❌`, `Swap не был выполнен ❌`, 400);
+        throw new BotError(`Swap not done ❌`, `Swap не был выполнен ❌`, HttpStatus.BAD_REQUEST);
       }
 
       console.log('#️⃣ Swap tx hash:', hash);
@@ -487,7 +491,7 @@ export class AnvilProvider implements OnModuleInit {
     const receipt = await this.publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`Liquidity not added ❌`, `Ликвидность не была добавлена ❌`, 400);
+      throw new BotError(`Liquidity not added ❌`, `Ликвидность не была добавлена ❌`, HttpStatus.BAD_REQUEST);
     }
   }
 }

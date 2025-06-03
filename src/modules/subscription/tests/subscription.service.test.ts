@@ -10,6 +10,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BotError } from '@src/errors/BotError';
 import { ChainsType } from '@src/types/types';
 import { SubscribeToWalletParams, UnsubscribeFromWalletParams } from '../types';
+import { HttpStatus } from '@nestjs/common';
 
 const mockSubscription = {
   id: 1,
@@ -111,7 +112,7 @@ describe('SubscriptionService', () => {
       mockRedisService.getUser = jest.fn().mockResolvedValue(mockUserSession);
 
       await expect(subscriptionService.subscribeToWallet(params)).rejects.toThrow(
-        new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', 400),
+        new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', HttpStatus.BAD_REQUEST),
       );
     });
   });
@@ -153,7 +154,7 @@ describe('SubscriptionService', () => {
       mockRedisService.getUser = jest.fn().mockResolvedValue(mockUserSession);
 
       await expect(subscriptionService.unsubscribeFromWallet(params)).rejects.toThrow(
-        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404),
+        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND),
       );
     });
   });
@@ -178,7 +179,7 @@ describe('SubscriptionService', () => {
       mockRedisService.getSubscriptions = jest.fn().mockResolvedValue([]);
 
       await expect(subscriptionService.getSubscriptions(chatId)).rejects.toThrow(
-        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', 404),
+        new BotError('You have no subscriptions', 'Вы не подписаны ни на один кошелек', HttpStatus.NOT_FOUND),
       );
     });
   });

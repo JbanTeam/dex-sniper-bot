@@ -2,7 +2,7 @@ import * as path from 'path';
 import { PublicClient } from 'viem';
 import { Repository } from 'typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { INestApplication } from '@nestjs/common';
+import { HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 
@@ -212,7 +212,7 @@ describe('WalletService Integration', () => {
         replications: [],
       });
       await expect(walletService.getWallets(chatId)).rejects.toThrow(
-        new BotError('You have no wallets', 'У вас нет кошельков', 404),
+        new BotError('You have no wallets', 'У вас нет кошельков', HttpStatus.NOT_FOUND),
       );
     });
   });
