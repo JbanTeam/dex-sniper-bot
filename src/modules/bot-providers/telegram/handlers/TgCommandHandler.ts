@@ -2,18 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
 import { IncomingMessage } from '@src/types/types';
+import { strIsPositiveNumber } from '@src/utils/utils';
+import { WalletService } from '@modules/wallet/wallet.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { UserTokenService } from '@modules/user-token/user-token.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { strIsPositiveNumber } from '@src/utils/utils';
+import { ReplicationService } from '@modules/replication/replication.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
-import { helpMessage, startMessage } from '@src/utils/constants';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
+import { HELP_MESSAGE, START_MESSAGE } from '@src/utils/constants';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
-import { WalletService } from '@modules/wallet/wallet.service';
-import { UserTokenService } from '@modules/user-token/user-token.service';
-import { ReplicationService } from '@modules/replication/replication.service';
 
 @Injectable()
 export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgCommandReturnType> {
@@ -35,7 +35,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
     switch (true) {
       case command.startsWith('/start'):
-        return { text: startMessage };
+        return { text: START_MESSAGE };
       case command.startsWith('/addtoken'):
         return this.addToken(message);
       case command.startsWith('/removetoken'):
@@ -63,7 +63,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       case command.startsWith('/fakefrom'):
         return this.fakeSwapFrom(message);
       case command.startsWith('/help'):
-        return { text: helpMessage };
+        return { text: HELP_MESSAGE };
       default:
         return { text: 'Неизвестная команда. Попробуйте /help.' };
     }
