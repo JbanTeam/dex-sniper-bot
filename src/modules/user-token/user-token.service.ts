@@ -19,6 +19,7 @@ import {
   RemoveTokenParams,
   UpdateTokenStorageParams,
 } from '@modules/user-token/types';
+import { MONITOR_DEX_EVENT } from '@src/utils/constants';
 
 @Injectable()
 export class UserTokenService {
@@ -49,7 +50,7 @@ export class UserTokenService {
       await this.createTestToken({ userSession, sessionToken, existsTokenId });
     }
 
-    if (pairAddresses) this.eventEmitter.emit('monitorDex', { network });
+    if (pairAddresses) this.eventEmitter.emit(MONITOR_DEX_EVENT, { network });
 
     return this.prepareTokensReply(tokens);
   }

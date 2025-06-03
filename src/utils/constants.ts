@@ -77,6 +77,14 @@ export const tgCommands = [
   { command: 'balance', description: 'Посмотреть баланс' },
 ];
 
+export const ENCRYPT_ALGORITHM = 'aes-256-gcm';
+export const ENCRYPTED_KEY_LENGTH = 32;
+export const ENCRYPTED_IV_LENGTH = 12;
+export const LOG_ADDRESS_LENGTH = 26;
+
+export const MONITOR_DEX_EVENT = 'monitorDex';
+export const NOTIFY_USER_EVENT = 'notifyUser';
+
 export const parsedFactoryAbi = parseAbi([
   'function allPairs(uint256) view returns (address)',
   'function allPairsLength() view returns (uint256)',

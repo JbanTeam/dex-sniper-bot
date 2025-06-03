@@ -24,7 +24,7 @@ import { decryptPrivateKey } from '@src/utils/crypto';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@src/utils/constants';
+import { NOTIFY_USER_EVENT, parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@src/utils/constants';
 import { abi as routerAbi } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { BalanceInfo, PairAddresses, Transaction } from '../types';
 import { Address, Network, SessionReplication, ViemNetwork } from '@src/types/types';
@@ -422,7 +422,7 @@ export class ViemHelperProvider implements OnModuleInit {
   }
 
   notifyUser({ chatId, text }: { chatId: number; text: string }): void {
-    this.eventEmitter.emit('notifyUser', { chatId, text });
+    this.eventEmitter.emit(NOTIFY_USER_EVENT, { chatId, text });
   }
 
   handleError(error: unknown, errMsg: string): void {
