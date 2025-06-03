@@ -16,6 +16,11 @@ services:
     volumes:
       - pg_DEV_data:/var/lib/postgresql/data
 
+  redis:
+    container_name: dex_sniper-dev-redis
+    volumes:
+      - redis_DEV_data:/data
+
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: dex_sniper-anvil
@@ -36,3 +41,4 @@ services:
 
 volumes:
   pg_DEV_data:
+  redis_DEV_data:
