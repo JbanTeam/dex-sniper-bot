@@ -1,15 +1,13 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
 import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'class-validator';
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
 import { Replication } from '@modules/replication/replication.entity';
+import { BaseEntity } from '@src/common/entities/base.entity';
 
 @Entity()
-export class UserToken {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class UserToken extends BaseEntity {
   @Column()
   @IsEthereumAddress()
   address: `0x${string}`;

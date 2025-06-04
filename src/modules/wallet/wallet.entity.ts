@@ -1,14 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, Column, ManyToOne } from 'typeorm';
 import { IsEnum, IsEthereumAddress, IsString } from 'class-validator';
 
-import { User } from '@modules/user/user.entity';
 import { Network } from '@src/types/types';
+import { User } from '@modules/user/user.entity';
+import { BaseEntity } from '@src/common/entities/base.entity';
 
 @Entity()
-export class Wallet {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class Wallet extends BaseEntity {
   @Column({ enum: Network })
   @IsEnum(Network)
   network: Network;

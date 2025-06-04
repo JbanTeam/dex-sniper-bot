@@ -1,15 +1,13 @@
 import { IsEnum, IsEthereumAddress, ValidateNested } from 'class-validator';
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
 import { Replication } from '@modules/replication/replication.entity';
+import { BaseEntity } from '@src/common/entities/base.entity';
 
 @Entity()
-export class Subscription {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class Subscription extends BaseEntity {
   @Column()
   @IsEthereumAddress()
   address: `0x${string}`;
