@@ -56,9 +56,11 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const userSession = await this.redisService.getUser(query.chatId);
 
       if (!userSession.tempToken) throw new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND);
+
       isEtherAddress(userSession.tempToken);
 
       if (!network) throw new BotError('Network not found', 'Сеть не найдена', HttpStatus.NOT_FOUND);
+
       isNetwork(network);
 
       const reply = await this.tokenService.addToken({
@@ -120,13 +122,14 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   subscribeCb: TgQueryFunction = async query => {
     try {
       const [, network] = query.data.split('-');
-
       const tempWallet = await this.redisService.getTempWallet(query.chatId);
 
       if (!tempWallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
+
       isEtherAddress(tempWallet);
 
       if (!network) throw new BotError('Network not found', 'Сеть не найдена', HttpStatus.NOT_FOUND);
+
       isNetwork(network);
 
       await this.subscriptionService.subscribeToWallet({
@@ -146,12 +149,15 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const [, network] = query.data.split('-');
       const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
 
-      if (!tempSendTokens)
+      if (!tempSendTokens) {
         throw new BotError('Error sending tokens', 'Ошибка отправки токенов', HttpStatus.BAD_REQUEST);
+      }
+
       const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
 
       isNetwork(network);
       isEtherAddress(recipientAddress);
+
       if (!strIsPositiveNumber(amount)) {
         throw new BotError(
           'Enter correct amount of tokens',
@@ -162,12 +168,15 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
 
       const userSession = await this.redisService.getUser(query.chatId);
       const wallet = userSession.wallets.find(wallet => wallet.network === network);
+
       if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
 
       const fullWallet = await this.walletService.findByAddress(wallet.address);
+
       if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
 
       let reply: string;
+
       if (tokenAddress === 'native') {
         const currency = this.constants.chains[network].tokenSymbol;
         await this.blockchainService.sendNative({
@@ -181,6 +190,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       } else {
         isEtherAddress(tokenAddress);
         const token = userSession.tokens.find(token => token.address === tokenAddress);
+
         if (!token) {
           throw new BotError('Token not found', 'Токен не найден в списке добавленных', HttpStatus.NOT_FOUND);
         }
@@ -206,8 +216,10 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     try {
       const [, tokenId] = query.data.split('-');
       const tempReplication = await this.redisService.getTempReplication(query.chatId);
-      if (!tempReplication)
+
+      if (!tempReplication) {
         throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
+      }
 
       tempReplication.tokenId = +tokenId;
       const reply = await this.replicationService.createOrUpdateReplication(tempReplication);
@@ -231,14 +243,18 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   private replicateSetSubscription: TgQueryFunction = async query => {
     try {
       const [, subscriptionId, network] = query.data.split('-');
+
       isNetwork(network);
 
       const tempReplication = await this.redisService.getTempReplication(query.chatId);
-      if (!tempReplication)
+
+      if (!tempReplication) {
         throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
+      }
 
       tempReplication.subscriptionId = +subscriptionId;
       tempReplication.network = network;
+
       await this.redisService.setUserField(query.chatId, 'tempReplication', JSON.stringify(tempReplication));
 
       const tokens = await this.redisService.getTokens(query.chatId, 'tokens');

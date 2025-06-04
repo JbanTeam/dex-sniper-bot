@@ -28,6 +28,7 @@ import { BotError } from '@src/errors/BotError';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { CachedContractsType } from '@modules/blockchain/viem/types';
 import { isEtherAddress } from '@src/types/typeGuards';
+import { REGEX_NUMBER } from '@src/utils/constants';
 
 @Injectable()
 export class RedisService {
@@ -369,7 +370,7 @@ export class RedisService {
     const parsedObject: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
-      if (/^-?\d+$/.test(value)) {
+      if (REGEX_NUMBER.test(value)) {
         parsedObject[key] = Number(value);
       } else if (value === 'true' || value === 'false') {
         parsedObject[key] = value === 'true';

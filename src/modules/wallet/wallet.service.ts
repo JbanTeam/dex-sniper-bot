@@ -36,6 +36,7 @@ export class WalletService {
 
   async getWallets(chatId: number): Promise<string> {
     const userSession = await this.redisService.getUser(chatId);
+
     if (!userSession.wallets.length) {
       throw new BotError('You have no wallets', 'У вас нет кошельков', HttpStatus.NOT_FOUND);
     }

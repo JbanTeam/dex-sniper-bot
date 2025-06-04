@@ -22,9 +22,13 @@ export class SubscriptionService {
     const userSession = await this.redisService.getUser(chatId);
 
     const existingSubscription = userSession.subscriptions.find(s => s.address.toLowerCase() === address.toLowerCase());
-    if (existingSubscription)
+
+    if (existingSubscription) {
       throw new BotError('You are already subscribed', 'Вы уже подписаны на этот кошелек', HttpStatus.BAD_REQUEST);
+    }
+
     const isSubscribeOnOwnWallet = userSession.wallets.find(w => w.address.toLowerCase() === address.toLowerCase());
+
     if (isSubscribeOnOwnWallet) {
       throw new BotError(
         'Subscribing on own wallet',
@@ -62,6 +66,7 @@ export class SubscriptionService {
     const sessionSubscription = userSession.subscriptions.find(
       sub => sub.address.toLowerCase() === walletAddress.toLowerCase(),
     );
+
     if (!sessionSubscription) {
       throw new BotError(
         'You are not subscribed on this wallet',
@@ -75,10 +80,12 @@ export class SubscriptionService {
     });
 
     if (!subscription) throw new BotError('Subscription not found', 'Подписка не найдена', HttpStatus.NOT_FOUND);
+
     const deleted = await this.subscriptionRepository.delete({ id: subscription.id });
 
-    if (!deleted.affected)
+    if (!deleted.affected) {
       throw new BotError('Error unsubscribing from wallet', 'Ошибка при отписке от кошелька', HttpStatus.BAD_REQUEST);
+    }
 
     await this.redisService.removeSubscription({
       chatId,

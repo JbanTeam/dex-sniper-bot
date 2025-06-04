@@ -7,6 +7,7 @@ import { UserToken } from './user-token.entity';
 import { BotError } from '@src/errors/BotError';
 import { SessionUserToken } from '@src/types/types';
 import { TokenData } from '@modules/blockchain/types';
+import { MONITOR_DEX_EVENT } from '@src/utils/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -19,7 +20,6 @@ import {
   RemoveTokenParams,
   UpdateTokenStorageParams,
 } from '@modules/user-token/types';
-import { MONITOR_DEX_EVENT } from '@src/utils/constants';
 
 @Injectable()
 export class UserTokenService {
@@ -57,6 +57,7 @@ export class UserTokenService {
 
   async getTokens(chatId: number): Promise<string> {
     const userSession = await this.redisService.getUser(chatId);
+
     if (!userSession.tokens.length) {
       throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND);
     }
@@ -66,7 +67,9 @@ export class UserTokenService {
 
   async removeToken({ chatId, address, network }: RemoveTokenParams): Promise<void> {
     const userSession = await this.redisService.getUser(chatId);
+
     if (!userSession) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
+
     if (!userSession.tokens.length) {
       throw new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND);
     }
@@ -173,11 +176,13 @@ export class UserTokenService {
     }
 
     const tokenData = await this.blockchainService.checkToken({ address, network });
+
     return { ...tokenData, existsTokenId: '' };
   }
 
   private createTokenEntity(tokenEntityParams: CreateTokenEntityParams): UserToken {
     const { userSession, ...createParams } = tokenEntityParams;
+
     return this.userTokenRepository.create({
       ...createParams,
       user: { id: userSession.userId },
@@ -187,6 +192,7 @@ export class UserTokenService {
   private prepareSessionToken(savedToken: UserToken): SessionUserToken {
     const sessionToken = { ...savedToken, user: undefined };
     delete sessionToken.user;
+
     return sessionToken;
   }
 

@@ -39,6 +39,7 @@ export class ReplicationService {
     );
 
     let reply = '<u>Ваши параметры повторов сделок:</u>\n\n';
+
     Object.entries(groupedReplications).forEach(([exchange, reps]) => {
       reply += `<u>${exchange}:</u>\n`;
       reps.forEach((rep, index) => {
@@ -54,6 +55,7 @@ export class ReplicationService {
 
   async createOrUpdateReplication(tempReplication: TempReplication): Promise<string> {
     const { action, limit, subscriptionId, tokenId, chatId } = tempReplication;
+
     if (!chatId || !subscriptionId || !tokenId) {
       throw new BotError(
         'Invalid data in tempReplication',
@@ -61,6 +63,7 @@ export class ReplicationService {
         HttpStatus.BAD_REQUEST,
       );
     }
+
     const userSession = await this.redisService.getUser(chatId);
 
     const existingReplication = userSession.replications.find(
@@ -77,6 +80,7 @@ export class ReplicationService {
 
   private async createReplication(tempReplication: TempReplication, userSession: SessionUser): Promise<string> {
     const { action, limit, network, subscriptionId, tokenId, chatId, userId } = tempReplication;
+
     if (!chatId || !userId || !subscriptionId || !tokenId) {
       throw new BotError(
         'Invalid data in tempReplication',
@@ -95,6 +99,7 @@ export class ReplicationService {
 
     const replication = this.replicationRepository.create(replicationData);
     await this.replicationRepository.save(replication);
+
     const fullReplication = await this.replicationRepository.findOne({
       where: { id: replication.id },
       relations: ['token', 'subscription', 'user'],
@@ -138,6 +143,7 @@ export class ReplicationService {
     tempReplication,
   }: PrepareSessionReplication): SessionReplication {
     const { subscriptionId, tokenId, chatId, userId } = tempReplication;
+
     if (!chatId || !userId || !subscriptionId || !tokenId) {
       throw new BotError(
         'Invalid data in tempReplication',
@@ -145,6 +151,7 @@ export class ReplicationService {
         HttpStatus.BAD_REQUEST,
       );
     }
+
     const sessionReplication = {
       ...replication,
       tokenAddress,
@@ -169,13 +176,16 @@ export class ReplicationService {
 
   private async updateReplication(existingReplication: SessionReplication, userSession: SessionUser): Promise<string> {
     const { buy, sell, chatId } = existingReplication;
+
     const updatedReplication = await this.replicationRepository.update(existingReplication.id, { buy, sell });
+
     if (!updatedReplication.affected) {
       throw new BotError('Error updating replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
     }
 
     userSession.replications = userSession.replications.filter(r => r.id !== existingReplication.id);
     userSession.replications.push(existingReplication);
+
     await this.redisService.setUserField(chatId, 'replications', JSON.stringify(userSession.replications));
 
     let reply = '';

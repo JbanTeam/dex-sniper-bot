@@ -24,10 +24,16 @@ import { decryptPrivateKey } from '@src/utils/crypto';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { NOTIFY_USER_EVENT, parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@src/utils/constants';
 import { abi as routerAbi } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { BalanceInfo, PairAddresses, Transaction } from '../types';
 import { Address, Network, SessionReplication, ViemNetwork } from '@src/types/types';
+import {
+  EMPTY_PAIR_ADDRESS,
+  NOTIFY_USER_EVENT,
+  parsedFactoryAbi,
+  parsedPairAbi,
+  parsedRouterAbi,
+} from '@src/utils/constants';
 import {
   AllowanceParams,
   ApproveParams,
@@ -154,15 +160,18 @@ export class ViemHelperProvider implements OnModuleInit {
 
   getSharedVars(network: Network): SharedVarsReturnType {
     const { chains, notProd, ANVIL_RPC_URL } = this.constants;
+
     const chain = notProd ? anvil : chains[network].chain;
     const rpcUrl = notProd ? ANVIL_RPC_URL : chains[network].rpcUrl;
     const nativeToken = notProd ? this.cachedContracts.nativeToken : chains[network].nativeToken;
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
+
     return { chain, rpcUrl, nativeToken, routerAddress };
   }
 
   formatBalanceResponse(balanceInfo: BalanceInfo): string {
     const { address, network, nativeBalance, tokenBalances } = balanceInfo;
+
     let balanceReply = `<b>Адрес:</b> <code>${address}</code>\n`;
     balanceReply += `<b>Сеть:</b> ${network}\n`;
     balanceReply += `<b>${nativeBalance.symbol}:</b> ${nativeBalance.amount}\n`;
@@ -176,12 +185,15 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async parseEventLog(log: Log, network: Network): Promise<Transaction | null> {
     if (!isSwapLog(log)) return null;
+
     let tokenIn: Address;
     let tokenOut: Address;
+
     const { chains, notProd } = this.constants;
     const { address, eventName } = log;
     const { sender, to, amount0In, amount1In, amount0Out, amount1Out } = log.args;
     const prefix = notProd ? 'testPair' : 'pair';
+
     const pair = await this.redisService.getPair({ prefix, pairAddress: address, network });
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
 
@@ -196,8 +208,10 @@ export class ViemHelperProvider implements OnModuleInit {
       tokenIn = pair.token1;
       tokenOut = pair.token0;
     }
+
     const amountIn = amount0In + amount1In;
     const amountOut = amount0Out + amount1Out;
+
     const parsedLog: Transaction = {
       eventName,
       pairAddress: address.toLowerCase() as Address,
@@ -225,6 +239,7 @@ export class ViemHelperProvider implements OnModuleInit {
     subscriptionAddress,
   }: MatchedReplicationParams): SessionReplication | undefined {
     const { tokenIn, tokenOut, amountIn, amountOut, network } = tx;
+
     const nativeToken = this.getSharedVars(network).nativeToken;
     const isInNative = tokenIn === nativeToken;
     const isOutNative = tokenOut === nativeToken;
@@ -311,6 +326,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async approve({ tokenAddress, walletClient, tx, account }: ApproveParams): Promise<void> {
     const { network, routerAddress, amountIn } = tx;
+
     await walletClient.writeContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -323,6 +339,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async allowance({ routerAddress, tokenAddress, walletAddress, network }: AllowanceParams): Promise<bigint> {
     const publicClient = this.clients.public[network];
+
     return publicClient.readContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -357,6 +374,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
     const publicClient = this.clients.public[tx.network];
     const receipt = await publicClient.getTransactionReceipt({ hash });
+
     const parsedLogs = parseEventLogs({
       abi: parsedPairAbi,
       eventName: 'Swap',
@@ -368,6 +386,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
     for (const log of parsedLogs) {
       if (!isSwapLog(log)) continue;
+
       if (log.args.amount0In > 0) {
         amountIn = log.args.amount0In;
         amountOut = log.args.amount1Out;
@@ -376,6 +395,7 @@ export class ViemHelperProvider implements OnModuleInit {
         amountOut = log.args.amount0Out;
       }
     }
+
     return { amountIn, amountOut };
   }
 
@@ -387,7 +407,7 @@ export class ViemHelperProvider implements OnModuleInit {
       args: [nativeToken, tokenAddress],
     });
 
-    if (pairAddress === '0x0000000000000000000000000000000000000000') {
+    if (pairAddress === EMPTY_PAIR_ADDRESS) {
       throw new BotError('Pair does not exist', 'Пара не существует', HttpStatus.BAD_REQUEST);
     }
 

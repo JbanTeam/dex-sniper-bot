@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { BotError } from '@src/errors/BotError';
-import { tgCommands } from '@src/utils/constants';
+import { NOTIFY_USER_EVENT, tgCommands } from '@src/utils/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -100,6 +100,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error while getting updates: ${message}`);
+
         if (this.stopped) return;
 
         console.log(`Retrying in ${this.retryDelay / 1000} seconds...`);
@@ -108,7 +109,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  @OnEvent('notifyUser')
+  @OnEvent(NOTIFY_USER_EVENT)
   async notifyUser({ chatId, text }: { chatId: number; text: string }): Promise<void> {
     try {
       await this.sendMessage({ chatId, text });
@@ -120,6 +121,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
   private async setCommands(): Promise<void> {
     const url = `${this.TG_URL}/setMyCommands`;
+
     const body = {
       commands: tgCommands,
       scope: { type: 'all_private_chats' },
@@ -142,6 +144,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
   private async handleIncomingMessage(message: IncomingMessage | IncomingQuery): Promise<void> {
     const response = await this.routeMessage(message);
+
     if ('data' in message) {
       await this.deleteMessage({ chatId: message.chatId, messageId: message.messageId });
     }

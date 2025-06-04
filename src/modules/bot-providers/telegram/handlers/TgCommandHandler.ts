@@ -75,6 +75,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
     try {
       const userExists = await this.redisService.existsInSet('users', message.chatId.toString());
+
       if (!userExists) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
       isEtherAddress(tokenAddress, 'Введите корректный адрес токена. Пример: /addtoken [адрес_токена]');
@@ -122,6 +123,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
         const chain = this.constants.chains[wallet.network];
         return [{ text: `${chain.name}`, callback_data: `rm-${wallet.network}` }];
       });
+
       keyboard?.push([{ text: 'Все токены', callback_data: 'rm-all' }]);
 
       return {
@@ -284,6 +286,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
   sendTokens: TgCommandFunction = async message => {
     try {
       const parts = message.text.split(' ');
+
       if (parts.length !== 3 && parts.length !== 4) {
         throw new BotError('Invalid format', 'Неверный формат команды', HttpStatus.BAD_REQUEST);
       }
@@ -294,6 +297,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
 
       if (parts.length === 4) {
         [, tokenAddress, amount, recipientAddress] = parts;
+
         isEtherAddress(tokenAddress, 'Введите корректный адрес токена');
       } else {
         [, amount, recipientAddress] = parts;
@@ -350,9 +354,11 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
           HttpStatus.BAD_REQUEST,
         );
       }
+
       const testToken = testTokens[0];
 
       if (!testToken) throw new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND);
+
       await this.blockchainService.fakeSwapTo(testToken);
 
       return { text: 'Транзакция отправлена', options: { parse_mode: 'html' } };
