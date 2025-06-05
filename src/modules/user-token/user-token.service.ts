@@ -7,7 +7,7 @@ import { UserToken } from './user-token.entity';
 import { BotError } from '@libs/core/errors';
 import { SessionUserToken } from '@src/types/types';
 import { TokenData } from '@modules/blockchain/types';
-import { MONITOR_DEX_EVENT } from '@src/utils/constants';
+import { MONITOR_DEX_EVENT } from '@src/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';

@@ -7,7 +7,7 @@ import {
   PublicClient,
   WalletClient,
 } from 'viem';
-import * as crypto from '@src/utils/crypto';
+import * as crypto from '@libs/core/utils';
 
 import { ViemProvider } from '../viem.provider';
 import { AnvilProvider } from '../anvil/anvil.provider';

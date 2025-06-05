@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
-import { NOTIFY_USER_EVENT, tgCommands } from '@src/utils/constants';
+import { NOTIFY_USER_EVENT, tgCommands } from '@src/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';

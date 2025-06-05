@@ -28,7 +28,7 @@ import { BotError } from '@libs/core/errors';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { CachedContractsType } from '@modules/blockchain/viem/types';
 import { isEtherAddress } from '@src/types/typeGuards';
-import { REGEX_NUMBER } from '@src/utils/constants';
+import { REGEX_NUMBER } from '@src/constants';
 
 @Injectable()
 export class RedisService {

@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
 import { IncomingMessage } from '@src/types/types';
-import { strIsPositiveNumber } from '@src/utils/utils';
+import { strIsPositiveNumber } from '@libs/core/utils';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
@@ -12,7 +12,7 @@ import { ReplicationService } from '@modules/replication/replication.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
-import { HELP_MESSAGE, START_MESSAGE } from '@src/utils/constants';
+import { HELP_MESSAGE, START_MESSAGE } from '@src/constants';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
 
 @Injectable()

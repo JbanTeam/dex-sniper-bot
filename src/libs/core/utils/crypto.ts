@@ -1,7 +1,8 @@
 import * as crypto from 'crypto';
-import { BotError } from '@libs/core/errors';
-import { ENCRYPT_ALGORITHM, ENCRYPTED_IV_LENGTH, ENCRYPTED_KEY_LENGTH } from './constants';
 import { HttpStatus } from '@nestjs/common';
+
+import { BotError } from '@libs/core/errors';
+import { ENCRYPT_ALGORITHM, ENCRYPTED_IV_LENGTH, ENCRYPTED_KEY_LENGTH } from '@src/constants';
 
 type Hex = `0x${string}`;
 

@@ -1,18 +1,18 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
-import { RedisService } from '@modules/redis/redis.service';
-import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { WalletService } from '@modules/wallet/wallet.service';
-import { strIsPositiveNumber } from '@src/utils/utils';
 import { IncomingQuery } from '@src/types/types';
-import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
-import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
-import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
+import { strIsPositiveNumber } from '@libs/core/utils';
+import { RedisService } from '@modules/redis/redis.service';
+import { WalletService } from '@modules/wallet/wallet.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UserTokenService } from '@modules/user-token/user-token.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 import { ReplicationService } from '@modules/replication/replication.service';
+import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
+import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {

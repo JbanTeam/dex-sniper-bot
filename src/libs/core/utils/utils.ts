@@ -1,4 +1,4 @@
-import { LOG_ADDRESS_LENGTH } from './constants';
+import { LOG_ADDRESS_LENGTH } from '@src/constants';
 
 function strIsPositiveNumber(value: string) {
   return /^\d+$/.test(value);
