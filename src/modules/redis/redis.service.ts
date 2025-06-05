@@ -1,6 +1,11 @@
 import Redis from 'ioredis';
 import { HttpStatus, Injectable } from '@nestjs/common';
 
+import { BotError } from '@libs/core/errors';
+import { REGEXP_NUMBER } from '@src/constants';
+import { isEtherAddress } from '@src/types/typeGuards';
+import { CachedContractsType } from '@modules/blockchain/viem/types';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import {
   Network,
   SessionUser,
@@ -24,11 +29,6 @@ import {
   TxContextType,
   FilterTokensReturnType,
 } from './types';
-import { BotError } from '@libs/core/errors';
-import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { CachedContractsType } from '@modules/blockchain/viem/types';
-import { isEtherAddress } from '@src/types/typeGuards';
-import { REGEX_NUMBER } from '@src/constants';
 
 @Injectable()
 export class RedisService {
@@ -370,7 +370,7 @@ export class RedisService {
     const parsedObject: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
-      if (REGEX_NUMBER.test(value)) {
+      if (REGEXP_NUMBER.test(value)) {
         parsedObject[key] = Number(value);
       } else if (value === 'true' || value === 'false') {
         parsedObject[key] = value === 'true';

@@ -65,6 +65,24 @@ export const HELP_MESSAGE = `
 /send - Отправить токены или нативную валюту (/send <i>[сумма] [адрес_получателя]</i> - отправить нативную валюту(BNB, POL); /send <i>[адрес_токена] [сумма] [адрес_получателя]</i> - отправить токен)
 `;
 
+export const commandsRegexp = {
+  start: /^\/start/,
+  help: /^\/help/,
+  wallets: /^\/wallets/,
+  addToken: /^\/addtoken/,
+  removeToken: /^\/removetoken/,
+  tokens: /^\/tokens/,
+  follow: /^\/follow/,
+  unfollow: /^\/unfollow/,
+  subscriptions: /^\/subscriptions/,
+  replicate: /^\/replicate/,
+  replications: /^\/replications/,
+  balance: /^\/balance/,
+  send: /^\/send/,
+  fakeTo: /^\/faketo/,
+  fakeFrom: /^\/fakefrom/,
+};
+
 export const tgCommands = [
   { command: 'start', description: ' Приветствие, функциональность' },
   { command: 'help', description: 'Помощь' },
@@ -79,7 +97,7 @@ export const ENCRYPT_ALGORITHM = 'aes-256-gcm';
 export const ENCRYPTED_KEY_LENGTH = 32;
 export const ENCRYPTED_IV_LENGTH = 12;
 export const LOG_ADDRESS_LENGTH = 26;
-export const REGEX_NUMBER = /^-?\d+$/;
+export const REGEXP_NUMBER = /^-?\d+$/;
 
 export const MONITOR_DEX_EVENT = 'monitorDex';
 export const NOTIFY_USER_EVENT = 'notifyUser';

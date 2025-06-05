@@ -12,7 +12,7 @@ import { ReplicationService } from '@modules/replication/replication.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
-import { HELP_MESSAGE, START_MESSAGE } from '@src/constants';
+import { commandsRegexp, HELP_MESSAGE, START_MESSAGE } from '@src/constants';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';
 
 @Injectable()
@@ -31,42 +31,31 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
   }
 
   handleCommand: TgCommandFunction = async message => {
-    const command = message.text.trim();
+    const commandPatterns: [RegExp, TgCommandFunction][] = [
+      [commandsRegexp.start, async () => ({ text: START_MESSAGE })],
+      [commandsRegexp.help, async () => ({ text: HELP_MESSAGE })],
+      [commandsRegexp.wallets, this.getWallets],
+      [commandsRegexp.addToken, this.addToken],
+      [commandsRegexp.removeToken, this.removeToken],
+      [commandsRegexp.tokens, this.getTokens],
+      [commandsRegexp.follow, this.subscribe],
+      [commandsRegexp.unfollow, this.unsubscribe],
+      [commandsRegexp.subscriptions, this.getSubscriptions],
+      [commandsRegexp.replicate, this.replicate],
+      [commandsRegexp.replications, this.getReplications],
+      [commandsRegexp.balance, this.getBalance],
+      [commandsRegexp.send, this.sendTokens],
+      [commandsRegexp.fakeTo, this.fakeSwapTo],
+      [commandsRegexp.fakeFrom, this.fakeSwapFrom],
+    ];
 
-    switch (true) {
-      case command.startsWith('/start'):
-        return { text: START_MESSAGE };
-      case command.startsWith('/addtoken'):
-        return this.addToken(message);
-      case command.startsWith('/removetoken'):
-        return this.removeToken(message);
-      case command.startsWith('/tokens'):
-        return this.getTokens(message);
-      case command.startsWith('/wallets'):
-        return this.getWallets(message);
-      case command.startsWith('/balance'):
-        return this.getBalance(message);
-      case command.startsWith('/follow'):
-        return this.subscribe(message);
-      case command.startsWith('/unfollow'):
-        return this.unsubscribe(message);
-      case command.startsWith('/subscriptions'):
-        return this.getSubscriptions(message);
-      case command.startsWith('/replicate'):
-        return this.replicate(message);
-      case command.startsWith('/replications'):
-        return this.getReplications(message);
-      case command.startsWith('/send'):
-        return this.sendTokens(message);
-      case command.startsWith('/faketo'):
-        return this.fakeSwapTo(message);
-      case command.startsWith('/fakefrom'):
-        return this.fakeSwapFrom(message);
-      case command.startsWith('/help'):
-        return { text: HELP_MESSAGE };
-      default:
-        return { text: 'Неизвестная команда. Попробуйте /help.' };
+    for (const [pattern, handler] of commandPatterns) {
+      if (pattern.test(message.text)) {
+        return handler(message);
+      }
     }
+
+    return { text: 'Неизвестная команда. Попробуйте /help.' };
   };
 
   addToken: TgCommandFunction = async message => {
