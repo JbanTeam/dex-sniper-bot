@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { UserToken } from './user-token.entity';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { SessionUserToken } from '@src/types/types';
 import { TokenData } from '@modules/blockchain/types';
 import { MONITOR_DEX_EVENT } from '@src/utils/constants';

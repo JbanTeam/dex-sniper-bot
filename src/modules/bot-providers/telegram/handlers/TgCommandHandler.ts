@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { IncomingMessage } from '@src/types/types';
 import { strIsPositiveNumber } from '@src/utils/utils';
 import { WalletService } from '@modules/wallet/wallet.service';

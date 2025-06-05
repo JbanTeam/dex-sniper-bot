@@ -7,7 +7,7 @@ import { Subscription } from '../subscription.entity';
 import { User } from '@modules/user/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { ChainsType } from '@src/types/types';
 import { SubscribeToWalletParams, UnsubscribeFromWalletParams } from '../types';
 import { HttpStatus } from '@nestjs/common';

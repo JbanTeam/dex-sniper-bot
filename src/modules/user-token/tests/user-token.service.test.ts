@@ -8,7 +8,7 @@ import { User } from '@modules/user/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ChainsType, SessionUser, SessionUserToken } from '@src/types/types';
 import { HttpStatus } from '@nestjs/common';

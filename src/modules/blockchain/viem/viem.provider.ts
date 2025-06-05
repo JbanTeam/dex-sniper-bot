@@ -14,13 +14,13 @@ import {
   http,
 } from 'viem';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { ViemHelperProvider } from './viem-helper.provider';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { MONITOR_DEX_EVENT, parsedPairAbi, TRANSACTION_MAX_DEPTH } from '@src/utils/constants';
+import { MONITOR_DEX_EVENT, TRANSACTION_MAX_DEPTH } from '@src/utils/constants';
 import { encryptPrivateKey } from '@src/utils/crypto';
 import { BaseNetworkProvider } from '../BaseNetworkProvider';
 import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
@@ -43,6 +43,7 @@ import {
   TokenBalanceReturnType,
   Transaction,
 } from '../types';
+import { parsedPairAbi } from '@libs/abi';
 
 @Injectable()
 export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, OnModuleDestroy {

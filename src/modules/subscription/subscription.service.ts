@@ -4,7 +4,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { SubscribeToWalletParams, UnsubscribeFromWalletParams } from './types';
 import { Address, SessionSubscription } from '@src/types/types';
 import { Subscription } from './subscription.entity';

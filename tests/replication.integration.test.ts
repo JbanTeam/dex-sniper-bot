@@ -24,7 +24,7 @@ import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';
 import { ViemHelperProvider } from '@modules/blockchain/viem/viem-helper.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { Network, Address, TempReplication, ViemNetwork } from '@src/types/types';
 import { ViemClientsType, UnwatchCallback } from '@modules/blockchain/viem/types';
 import { PublicClient } from 'viem';

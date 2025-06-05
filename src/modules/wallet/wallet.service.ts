@@ -6,7 +6,7 @@ import { Wallet } from './wallet.entity';
 import { Address } from '@src/types/types';
 import { CreateWalletParams } from './types';
 import { RedisService } from '@modules/redis/redis.service';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 
 @Injectable()
 export class WalletService {

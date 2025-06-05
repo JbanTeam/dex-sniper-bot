@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { ENCRYPT_ALGORITHM, ENCRYPTED_IV_LENGTH, ENCRYPTED_KEY_LENGTH } from './constants';
 import { HttpStatus } from '@nestjs/common';
 

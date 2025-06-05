@@ -1,6 +1,6 @@
 import { isEthereumAddress } from 'class-validator';
 import { Network } from './types';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { HttpStatus } from '@nestjs/common';
 
 function isEtherAddress(address: string, errMsg: string = 'Неверный формат адреса'): asserts address is `0x${string}` {

@@ -17,11 +17,10 @@ import {
 } from 'viem';
 
 import { isNetwork } from '@src/types/typeGuards';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { ViemHelperProvider } from '../viem-helper.provider';
-import { parsedRouterAbi } from '@src/utils/constants';
 import { abi as coinAbi, bytecode as coinBytecode } from '@src/contract-artifacts/MyToken.json';
 import { abi as pairAbi } from '@src/contract-artifacts/UniswapV2Pair.json';
 import { abi as factoryAbi, bytecode as factoryBytecode } from '@src/contract-artifacts/UniswapV2Factory.json';
@@ -41,6 +40,7 @@ import {
   AddLiquidityParams,
   CreateTestTokenReturnType,
 } from '../types';
+import { parsedRouterAbi } from '@libs/abi';
 
 @Injectable()
 export class AnvilProvider implements OnModuleInit {

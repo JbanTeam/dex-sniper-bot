@@ -15,7 +15,7 @@ import { SubscriptionService } from '@modules/subscription/subscription.service'
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsModule } from '@modules/constants/constants.module';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';

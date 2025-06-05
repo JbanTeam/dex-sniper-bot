@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 
 import { Replication } from './replication.entity';
 import { PrepareSessionReplication } from './types';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SessionReplication, SessionUser, TempReplication } from '@src/types/types';

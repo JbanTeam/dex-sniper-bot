@@ -2,7 +2,7 @@ import { Repository } from 'typeorm';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { ReplicationService } from '../replication.service';
 import { Replication } from '../replication.entity';
 import { RedisService } from '@modules/redis/redis.service';

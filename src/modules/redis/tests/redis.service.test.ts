@@ -1,7 +1,7 @@
 import Redis, { ChainableCommander } from 'ioredis';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { RedisService } from '../redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SessionUser, Address } from '@src/types/types';

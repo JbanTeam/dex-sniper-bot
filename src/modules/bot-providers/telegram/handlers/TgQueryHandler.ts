@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';

@@ -18,7 +18,7 @@ import {
 
 import { isSwapLog } from './typeGuards';
 import { AnvilProvider } from './anvil/anvil.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { isNetwork } from '@src/types/typeGuards';
 import { decryptPrivateKey } from '@src/utils/crypto';
 import { Wallet } from '@modules/wallet/wallet.entity';
@@ -27,13 +27,8 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { abi as routerAbi } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { BalanceInfo, PairAddresses, Transaction } from '../types';
 import { Address, Network, SessionReplication, ViemNetwork } from '@src/types/types';
-import {
-  EMPTY_PAIR_ADDRESS,
-  NOTIFY_USER_EVENT,
-  parsedFactoryAbi,
-  parsedPairAbi,
-  parsedRouterAbi,
-} from '@src/utils/constants';
+import { EMPTY_PAIR_ADDRESS, NOTIFY_USER_EVENT } from '@src/utils/constants';
+import { parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@libs/abi';
 import {
   AllowanceParams,
   ApproveParams,

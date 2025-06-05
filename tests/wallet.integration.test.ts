@@ -6,7 +6,7 @@ import { HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { User } from '@modules/user/user.entity';
 import { UserModule } from '@modules/user/user.module';
 import { UserService } from '@modules/user/user.service';
