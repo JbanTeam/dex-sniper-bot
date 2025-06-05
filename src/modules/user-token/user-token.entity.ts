@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'class-validator';
 
 import { Network } from '@src/types/types';
@@ -29,6 +29,7 @@ export class UserToken extends BaseEntity {
   decimals: number;
 
   @ManyToOne(() => User, user => user.tokens, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @OneToMany(() => Replication, repl => repl.token, { cascade: true })

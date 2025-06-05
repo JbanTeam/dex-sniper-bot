@@ -12,10 +12,10 @@ export class User extends BaseEntity {
   // TODO: возвращается string
   @Column({ unique: true, type: 'bigint' })
   @IsNumber()
-  chatId: number;
+  chat_id: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 
   @OneToMany(() => UserToken, token => token.user, { cascade: true })
   @ValidateNested({ each: true })

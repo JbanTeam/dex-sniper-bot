@@ -188,6 +188,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      console.log(error);
       console.error(`Error setting session: ${message}`);
     }
   }

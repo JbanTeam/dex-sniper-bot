@@ -338,14 +338,14 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
     for (const subscription of subscriptions) {
       try {
-        if (tx.initiators.includes(subscription.user.chatId)) continue;
+        if (tx.initiators.includes(subscription.user.chat_id)) continue;
 
         if (tx.replicationDepth >= TRANSACTION_MAX_DEPTH) continue;
 
         await this.replicateTransaction({ subscription, tx });
       } catch (error) {
         if (error instanceof BotError) {
-          error.chatId = subscription.user.chatId;
+          error.chatId = subscription.user.chat_id;
         }
 
         if (error?.details?.includes('Out of gas')) {
@@ -428,9 +428,9 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
   }
 
   private async replicateTransaction({ subscription, tx }: ReplicateTransactionParams): Promise<void> {
-    const { chatId } = subscription.user;
+    const { chat_id } = subscription.user;
     const { network } = tx;
-    const userSession = await this.redisService.getUser(chatId);
+    const userSession = await this.redisService.getUser(chat_id);
     const wallet = subscription.user.wallets.find(wallet => wallet.network === network);
 
     if (!userSession.replications.length) return;
@@ -463,7 +463,13 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       walletClient,
     });
 
-    const { amountIn, amountOut } = await this.viemHelper.swap({ walletAddress, tx, account, walletClient, chatId });
+    const { amountIn, amountOut } = await this.viemHelper.swap({
+      walletAddress,
+      tx,
+      account,
+      walletClient,
+      chatId: chat_id,
+    });
 
     const formattedAmountIn = formatUnits(amountIn, inDecimals);
     const formattedAmountOut = formatUnits(amountOut, outDecimals);
@@ -475,6 +481,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     reply += `<b>Потрачено:</b> ${formattedAmountIn} ${currencyIn}\n`;
     reply += `<b>Подписка ${exchange}:</b> <code>${subscription.address}</code>`;
 
-    this.viemHelper.notifyUser({ chatId, text: reply });
+    this.viemHelper.notifyUser({ chatId: chat_id, text: reply });
   }
 }

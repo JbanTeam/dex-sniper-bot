@@ -437,7 +437,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
   getAccount(wallet: Wallet): Account {
     return privateKeyToAccount(
-      decryptPrivateKey({ encryptedPrivateKey: wallet.encryptedPrivateKey, encryptKey: this.constants.ENCRYPT_KEY }),
+      decryptPrivateKey({ encryptedPrivateKey: wallet.encrypted_private_key, encryptKey: this.constants.ENCRYPT_KEY }),
     );
   }
 

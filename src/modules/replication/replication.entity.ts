@@ -1,5 +1,5 @@
 import { IsEnum } from 'class-validator';
-import { Column, Entity, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
@@ -20,11 +20,14 @@ export class Replication extends BaseEntity {
   sell: number;
 
   @ManyToOne(() => User, user => user.replications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @ManyToOne(() => Subscription, sub => sub.replications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'subscription_id' })
   subscription: Subscription;
 
   @ManyToOne(() => UserToken, token => token.replications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'token_id' })
   token: UserToken;
 }

@@ -136,11 +136,11 @@ export class SubscriptionService {
         address: true,
         network: true,
         user: {
-          chatId: true,
+          chat_id: true,
           wallets: {
             address: true,
             network: true,
-            encryptedPrivateKey: true,
+            encrypted_private_key: true,
           },
         },
       },

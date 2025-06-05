@@ -26,7 +26,7 @@ export class WalletService {
     const manager = entityManager || this.walletRepository.manager;
     const wallet = manager.create(Wallet, {
       network,
-      encryptedPrivateKey,
+      encrypted_private_key: encryptedPrivateKey,
       address,
       user: { id: userId },
     });

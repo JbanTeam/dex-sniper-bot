@@ -1,5 +1,5 @@
 import { IsEnum, IsEthereumAddress, ValidateNested } from 'class-validator';
-import { Entity, Column, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
@@ -17,6 +17,7 @@ export class Subscription extends BaseEntity {
   network: Network;
 
   @ManyToOne(() => User, user => user.subscriptions, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'user_id' })
   user: User;
 
   @OneToMany(() => Replication, repl => repl.subscription, { cascade: true })

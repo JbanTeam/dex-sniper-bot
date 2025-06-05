@@ -17,12 +17,12 @@ export class UserService {
 
   async getOrCreateUser(chatId: number): Promise<{ action: string; user: User | null }> {
     let action: string = 'get';
-    let user = await this.findById({ chatId });
+    let user = await this.findById({ chat_id: chatId });
 
     if (!user) {
       user = await this.userRepository.manager.transaction(async entityManager => {
         const createdUser = entityManager.create(User, {
-          chatId,
+          chat_id: chatId,
         });
 
         const savedUser = await entityManager.save(createdUser);
@@ -47,15 +47,15 @@ export class UserService {
     return { action, user };
   }
 
-  async findById(where: { id?: number; chatId?: number }, entityManager?: EntityManager): Promise<User | null> {
+  async findById(where: { id?: number; chat_id?: number }, entityManager?: EntityManager): Promise<User | null> {
     const manager = entityManager || this.userRepository.manager;
     const user = await manager.findOne(User, {
       where: { ...where },
       relations: ['wallets', 'tokens', 'subscriptions', 'replications'],
       select: {
         id: true,
-        createdAt: true,
-        chatId: true,
+        created_at: true,
+        chat_id: true,
         tokens: {
           id: true,
           address: true,
