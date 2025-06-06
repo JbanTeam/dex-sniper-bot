@@ -7,12 +7,12 @@ import {
   PublicClient,
   WalletClient,
 } from 'viem';
-import * as crypto from '@src/utils/crypto';
+import * as crypto from '@libs/core/utils';
 
 import { ViemProvider } from '../viem.provider';
 import { AnvilProvider } from '../anvil/anvil.provider';
 import { ViemHelperProvider } from '../viem-helper.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { User } from '@modules/user/user.entity';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { RedisService } from '@modules/redis/redis.service';

@@ -10,7 +10,7 @@ import { UserTokenService } from '@modules/user-token/user-token.service';
 import { ReplicationService } from '@modules/replication/replication.service';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { IncomingQuery, Network, SessionUser, SessionUserToken, SessionWallet } from '@src/types/types';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { User } from '@modules/user/user.entity';
 import { Wallet } from '@modules/wallet/wallet.entity';
 

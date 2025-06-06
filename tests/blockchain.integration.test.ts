@@ -8,7 +8,7 @@ import { getRepositoryToken, TypeOrmModule } from '@nestjs/typeorm';
 import { createPublicClient, http, webSocket } from 'viem';
 
 import { isNetwork } from '@src/types/typeGuards';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { User } from '@modules/user/user.entity';
 import { UserModule } from '@modules/user/user.module';
 import { UserService } from '@modules/user/user.service';

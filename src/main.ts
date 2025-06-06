@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { GlobalExceptionFilter } from './errors/global-exceptions.filter';
+import { GlobalExceptionFilter } from './libs/core/errors';
 
 async function start() {
   const app = await NestFactory.create(AppModule);

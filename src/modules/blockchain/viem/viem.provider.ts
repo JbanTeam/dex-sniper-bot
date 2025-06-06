@@ -1,5 +1,5 @@
 import { OnEvent } from '@nestjs/event-emitter';
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import {
   ContractFunctionExecutionError,
@@ -14,15 +14,15 @@ import {
   http,
 } from 'viem';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
+import { encryptPrivateKey } from '@libs/core/utils';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { ViemHelperProvider } from './viem-helper.provider';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { parsedPairAbi } from '@src/utils/constants';
-import { encryptPrivateKey } from '@src/utils/crypto';
-import { BaseNetworkProvider } from '../BaseNetworkProvider';
+import { BaseNetworkProvider } from '@src/common/network-provider/BaseNetworkProvider';
+import { MONITOR_DEX_EVENT, TRANSACTION_MAX_DEPTH } from '@src/constants';
 import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
 import { Network, ViemNetwork } from '@src/types/types';
 import {
@@ -43,6 +43,7 @@ import {
   TokenBalanceReturnType,
   Transaction,
 } from '../types';
+import { parsedPairAbi } from '@libs/abi';
 
 @Injectable()
 export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, OnModuleDestroy {
@@ -60,6 +61,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
   }
   async onModuleInit() {
     this.clients = this.viemHelper.getClients();
+
     if (this.constants.notProd) await this.viemHelper.initAnvil();
 
     this.unwatchCallbacks = this.viemHelper.initUnwatchCallbacks();
@@ -68,6 +70,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
     for (const network of networkKeys) {
       isNetwork(network);
+
       this.monitorDex({ network }).catch(error => {
         console.error('Error monitoring tokens:', error);
       });
@@ -95,8 +98,10 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
   async checkToken({ address, network }: CheckTokenParams): Promise<CheckTokenReturnType> {
     let publicClient: PublicClient;
+
     const { chains, notProd } = this.constants;
     const { factoryAddress, nativeToken } = chains[network];
+
     if (notProd) {
       publicClient = createPublicClient({
         chain: chains[network].chain,
@@ -117,14 +122,16 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       return { name, symbol, decimals, pairAddresses };
     } catch (error) {
       console.log(error);
+
       if (error instanceof ContractFunctionExecutionError) {
         throw new BotError(
           `This token does not exist in the network ${network}`,
           `Этого токена не существует в сети ${network}`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
-      throw new BotError(`Error checking token`, `Ошибка проверки токена`, 400);
+
+      throw new BotError(`Error checking token`, `Ошибка проверки токена`, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -172,13 +179,14 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     return this.viemHelper.formatBalanceResponse(balanceInfo);
   }
 
-  @OnEvent('monitorDex')
+  @OnEvent(MONITOR_DEX_EVENT)
   async monitorDex({ network }: { network: Network }): Promise<void> {
     this.unwatchCallbacks[network]();
     const client = this.clients.publicWebsocket[network];
 
     const prefix = this.constants.notProd ? 'testPairs' : 'pairs';
     const pairs = await this.redisService.getPairsSet(network, prefix);
+
     isEtherAddressArr(pairs);
 
     this.unwatchCallbacks[network] = client.watchEvent({
@@ -208,6 +216,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
             const prefix = this.constants.notProd ? 'testTokens' : 'tokens';
             const tokenInExists = await this.redisService.existsInSet(`${prefix}:${network}`, tx.tokenIn);
             const tokenOutExists = await this.redisService.existsInSet(`${prefix}:${network}`, tx.tokenOut);
+
             if (!tokenInExists && !tokenOutExists) continue;
 
             await this.handleTransaction({ tx });
@@ -231,16 +240,18 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
 
     if (this.constants.notProd) {
       const testToken = userSession.testTokens?.find(t => t.id === token.id);
+
       if (testToken) tokenAddress = testToken.address;
     }
 
     try {
       const nativeBalance = await publicClient.getBalance({ address: wallet.address });
+
       if (nativeBalance === 0n) {
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -252,7 +263,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Not enough tokens ${token.symbol} on balance: ${tokenBalance}`,
           `Недостаточное количество токенов <u>${token.symbol}</u> на балансе: ${tokenBalance}`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -262,9 +273,10 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
+
       throw error;
     }
   }
@@ -283,7 +295,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
 
@@ -293,9 +305,10 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         throw new BotError(
           `Top up balance ${currency} for transaction`,
           `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-          400,
+          HttpStatus.BAD_REQUEST,
         );
       }
+
       throw error;
     }
   }
@@ -323,26 +336,28 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     const subscriptions = await this.subscriptionService.findSubscriptionsByAddress(tx.userAddress);
 
     if (!subscriptions?.length) return;
+
     for (const subscription of subscriptions) {
       try {
-        if (tx.initiators.includes(subscription.user.chatId)) continue;
+        if (tx.initiators.includes(subscription.user.chat_id)) continue;
 
-        const maxDepth = 3;
-        if (tx.replicationDepth >= maxDepth) continue;
+        if (tx.replicationDepth >= TRANSACTION_MAX_DEPTH) continue;
 
         await this.replicateTransaction({ subscription, tx });
       } catch (error) {
         if (error instanceof BotError) {
-          error.chatId = subscription.user.chatId;
+          error.chatId = subscription.user.chat_id;
         }
+
         if (error?.details?.includes('Out of gas')) {
           const currency = this.constants.chains[tx.network].tokenSymbol;
           throw new BotError(
             `Top up balance ${currency} for transaction`,
             `Пополните баланс <u>${currency}</u> для совершения транзакции`,
-            400,
+            HttpStatus.BAD_REQUEST,
           );
         }
+
         throw error;
       }
     }
@@ -354,10 +369,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     tx,
     walletClient,
   }: BalanceAllowanceParams): Promise<BalanceAllowanceReturnType> {
-    const { network, routerAddress, amountIn, tokenIn } = tx;
-    const { nativeToken } = this.viemHelper.getSharedVars(network);
-    const walletAddress = account.address;
-    const publicClient = this.clients.public[network];
     let balance: bigint;
     let currencyIn: string;
     let currencyOut: string;
@@ -366,6 +377,10 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     let inDecimals: number;
     let outDecimals: number;
 
+    const { network, routerAddress, amountIn, tokenIn } = tx;
+    const { nativeToken } = this.viemHelper.getSharedVars(network);
+    const walletAddress = account.address;
+    const publicClient = this.clients.public[network];
     const inIsNative = tokenIn === nativeToken;
     const chain = this.constants.chains[network];
 
@@ -394,7 +409,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       reply += `<b>Баланс ${currencyIn}:</b> ${formattedBalance}\n`;
       reply += `<b>Требуемая сумма:</b> ${formattedAmountIn}\n`;
       reply += `<b>Подписка:</b> ${exchange} <code>${tx.sender}</code>\n`;
-      throw new BotError(`Not enough balance ${currencyIn}`, reply, 400);
+      throw new BotError(`Not enough balance ${currencyIn}`, reply, HttpStatus.BAD_REQUEST);
     }
 
     if (!inIsNative) {
@@ -404,6 +419,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
         walletAddress,
         network,
       });
+
       if (allowance < amountIn) {
         await this.viemHelper.approve({ tokenAddress: tokenIn, walletClient, tx, account });
       }
@@ -413,9 +429,9 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
   }
 
   private async replicateTransaction({ subscription, tx }: ReplicateTransactionParams): Promise<void> {
-    const { chatId } = subscription.user;
+    const { chat_id } = subscription.user;
     const { network } = tx;
-    const userSession = await this.redisService.getUser(chatId);
+    const userSession = await this.redisService.getUser(chat_id);
     const wallet = subscription.user.wallets.find(wallet => wallet.network === network);
 
     if (!userSession.replications.length) return;
@@ -425,14 +441,14 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       replications: userSession.replications,
       subscriptionAddress: subscription.address,
     });
-    console.log('matchedReplication', matchedReplication);
+
     if (!matchedReplication) return;
 
     if (!wallet) {
       throw new BotError(
         `Wallet for network ${network} not found`,
         `Кошелек для сети <u>${network}</u> не найден`,
-        400,
+        HttpStatus.BAD_REQUEST,
       );
     }
 
@@ -448,7 +464,14 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       walletClient,
     });
 
-    const { amountIn, amountOut } = await this.viemHelper.swap({ walletAddress, tx, account, walletClient, chatId });
+    const { amountIn, amountOut } = await this.viemHelper.swap({
+      walletAddress,
+      tx,
+      account,
+      walletClient,
+      chatId: chat_id,
+    });
+
     const formattedAmountIn = formatUnits(amountIn, inDecimals);
     const formattedAmountOut = formatUnits(amountOut, outDecimals);
 
@@ -459,6 +482,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     reply += `<b>Потрачено:</b> ${formattedAmountIn} ${currencyIn}\n`;
     reply += `<b>Подписка ${exchange}:</b> <code>${subscription.address}</code>`;
 
-    this.viemHelper.notifyUser({ chatId, text: reply });
+    this.viemHelper.notifyUser({ chatId: chat_id, text: reply });
   }
 }

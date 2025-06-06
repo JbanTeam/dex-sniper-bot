@@ -1,23 +1,21 @@
 import { IsNumber, ValidateNested } from 'class-validator';
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, CreateDateColumn } from 'typeorm';
+import { Entity, Column, OneToMany, CreateDateColumn } from 'typeorm';
 
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { UserToken } from '@modules/user-token/user-token.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
 import { Replication } from '@modules/replication/replication.entity';
+import { BaseEntity } from '@src/common/entities/base.entity';
 
 @Entity()
-export class User {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class User extends BaseEntity {
   // TODO: возвращается string
   @Column({ unique: true, type: 'bigint' })
   @IsNumber()
-  chatId: number;
+  chat_id: number;
 
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 
   @OneToMany(() => UserToken, token => token.user, { cascade: true })
   @ValidateNested({ each: true })

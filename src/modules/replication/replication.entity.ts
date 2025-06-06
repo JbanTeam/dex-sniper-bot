@@ -1,16 +1,14 @@
 import { IsEnum } from 'class-validator';
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 import { Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
 import { Subscription } from '@modules/subscription/subscription.entity';
 import { UserToken } from '@modules/user-token/user-token.entity';
+import { BaseEntity } from '@src/common/entities/base.entity';
 
 @Entity()
-export class Replication {
-  @PrimaryGeneratedColumn()
-  id: number;
-
+export class Replication extends BaseEntity {
   @Column({ enum: Network, default: Network.BSC })
   @IsEnum(Network)
   network: Network;
@@ -22,11 +20,14 @@ export class Replication {
   sell: number;
 
   @ManyToOne(() => User, user => user.replications, { onDelete: 'CASCADE' })
-  user: Subscription;
+  @JoinColumn({ name: 'user_id' })
+  user: User;
 
   @ManyToOne(() => Subscription, sub => sub.replications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'subscription_id' })
   subscription: Subscription;
 
   @ManyToOne(() => UserToken, token => token.replications, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'token_id' })
   token: UserToken;
 }
