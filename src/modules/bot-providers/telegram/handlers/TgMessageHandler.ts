@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { IncomingMessage } from '@src/types/types';
+import { BaseMessageHandler } from '@src/common/bot-handlers/BaseMessageHandler';
 import { TgCommandFunction, TgCommandReturnType } from '../types/types';
-import { BaseMessageHandler } from '@modules/bot-providers/handlers/BaseMessageHandler';
 
 @Injectable()
 export class TgMessageHandler extends BaseMessageHandler<IncomingMessage, TgCommandReturnType> {

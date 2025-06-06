@@ -10,7 +10,7 @@ import { UserTokenService } from '@modules/user-token/user-token.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { ReplicationService } from '@modules/replication/replication.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { BaseCommandHandler } from '@modules/bot-providers/handlers/BaseCommandHandler';
+import { BaseCommandHandler } from '@src/common/bot-handlers/BaseCommandHandler';
 import { isBuySell, isEtherAddress } from '@src/types/typeGuards';
 import { commandsRegexp, HELP_MESSAGE, START_MESSAGE } from '@src/constants';
 import { TgCommandFunction, TgCommandReturnType, TgSendMessageOptions } from '../types/types';

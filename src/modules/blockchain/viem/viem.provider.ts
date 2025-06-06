@@ -15,14 +15,14 @@ import {
 } from 'viem';
 
 import { BotError } from '@libs/core/errors';
+import { encryptPrivateKey } from '@libs/core/utils';
 import { AnvilProvider } from './anvil/anvil.provider';
 import { ViemHelperProvider } from './viem-helper.provider';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { BaseNetworkProvider } from '@src/common/network-provider/BaseNetworkProvider';
 import { MONITOR_DEX_EVENT, TRANSACTION_MAX_DEPTH } from '@src/constants';
-import { encryptPrivateKey } from '@libs/core/utils';
-import { BaseNetworkProvider } from '../BaseNetworkProvider';
 import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
 import { Network, ViemNetwork } from '@src/types/types';
 import {

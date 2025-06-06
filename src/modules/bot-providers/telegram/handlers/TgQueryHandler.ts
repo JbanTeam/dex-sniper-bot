@@ -9,7 +9,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UserTokenService } from '@modules/user-token/user-token.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
-import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
+import { BaseQueryHandler } from '@src/common/bot-handlers/BaseQueryHandler';
 import { ReplicationService } from '@modules/replication/replication.service';
 import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
 import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
