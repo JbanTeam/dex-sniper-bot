@@ -99,8 +99,10 @@ export const ENCRYPTED_IV_LENGTH = 12;
 export const LOG_ADDRESS_LENGTH = 26;
 export const REGEXP_NUMBER = /^-?\d+$/;
 
-export const MONITOR_DEX_EVENT = 'monitorDex';
-export const NOTIFY_USER_EVENT = 'notifyUser';
+export const eventsMap = {
+  MONITOR_DEX_EVENT: 'monitorDex',
+  NOTIFY_USER_EVENT: 'notifyUser',
+};
 
 export const EMPTY_PAIR_ADDRESS = '0x0000000000000000000000000000000000000000';
 export const TRANSACTION_MAX_DEPTH = 3;

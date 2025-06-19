@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
-import { IncomingMessage } from '@src/types/types';
+import { IncomingMessage, TokenAddressType } from '@src/types/types';
 import { strIsPositiveNumber } from '@libs/core/utils';
 import { WalletService } from '@modules/wallet/wallet.service';
 import { RedisService } from '@modules/redis/redis.service';
@@ -301,7 +301,7 @@ export class TgCommandHandler extends BaseCommandHandler<IncomingMessage, TgComm
       await this.redisService.setUserField(
         message.chatId,
         'tempSendTokens',
-        `${tokenAddress || 'native'}:${amount}:${recipientAddress}`,
+        `${tokenAddress || TokenAddressType.NATIVE}:${amount}:${recipientAddress}`,
       );
 
       const networks = Object.entries(this.constants.chains);

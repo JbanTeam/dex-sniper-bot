@@ -1,5 +1,5 @@
 import { isEthereumAddress } from 'class-validator';
-import { Network } from './types';
+import { BuySell, Network, NetworkType, TokenAddressType } from './types';
 import { BotError } from '@libs/core/errors';
 import { HttpStatus } from '@nestjs/common';
 
@@ -9,6 +9,10 @@ function isEtherAddress(address: string, errMsg: string = 'Неверный фо
 
 function isEtherAddressArr(addresses: string[]): asserts addresses is `0x${string}`[] {
   for (const address of addresses) isEtherAddress(address);
+}
+
+function isTokenAddressType(value: string): value is TokenAddressType {
+  return Object.values(TokenAddressType).includes(value as TokenAddressType);
 }
 
 function isNetwork(network: string): asserts network is Network {
@@ -21,7 +25,7 @@ function isNetworkArr(networks: string[]): asserts networks is Network[] {
   for (const network of networks) isNetwork(network);
 }
 
-function isBuySell(action: string): asserts action is 'buy' | 'sell' {
+function isBuySell(action: string): asserts action is BuySell {
   if (!action || (action !== 'buy' && action !== 'sell')) {
     throw new BotError(
       'Wrong command',
@@ -31,12 +35,20 @@ function isBuySell(action: string): asserts action is 'buy' | 'sell' {
   }
 }
 
-function isValidRemoveQueryData(network: string): asserts network is Network | 'all' {
-  const possibleNetworks: (Network | 'all')[] = Object.values(Network);
-  possibleNetworks.push('all');
-  if (!possibleNetworks.includes(network as Network | 'all')) {
+function isValidRemoveQueryData(network: string): asserts network is Network | NetworkType.ALL {
+  const possibleNetworks: (Network | NetworkType.ALL)[] = Object.values(Network);
+  possibleNetworks.push(NetworkType.ALL);
+  if (!possibleNetworks.includes(network as Network | NetworkType.ALL)) {
     throw new BotError(`Invalid query data`, 'Неверные данные запроса', HttpStatus.BAD_REQUEST);
   }
 }
 
-export { isEtherAddress, isEtherAddressArr, isNetwork, isNetworkArr, isBuySell, isValidRemoveQueryData };
+export {
+  isEtherAddress,
+  isEtherAddressArr,
+  isTokenAddressType,
+  isNetwork,
+  isNetworkArr,
+  isBuySell,
+  isValidRemoveQueryData,
+};

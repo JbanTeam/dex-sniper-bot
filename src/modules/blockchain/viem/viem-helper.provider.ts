@@ -27,7 +27,7 @@ import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { abi as routerAbi } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { BalanceInfo, PairAddresses, Transaction } from '../types';
 import { Address, Network, SessionReplication, ViemNetwork } from '@src/types/types';
-import { EMPTY_PAIR_ADDRESS, NOTIFY_USER_EVENT } from '@src/constants';
+import { EMPTY_PAIR_ADDRESS, eventsMap } from '@src/constants';
 import { parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@libs/abi';
 import {
   AllowanceParams,
@@ -432,12 +432,12 @@ export class ViemHelperProvider implements OnModuleInit {
 
   getAccount(wallet: Wallet): Account {
     return privateKeyToAccount(
-      decryptPrivateKey({ encryptedPrivateKey: wallet.encrypted_private_key, encryptKey: this.constants.ENCRYPT_KEY }),
+      decryptPrivateKey({ encryptedPrivateKey: wallet.encryptedPrivateKey, encryptKey: this.constants.ENCRYPT_KEY }),
     );
   }
 
   notifyUser({ chatId, text }: { chatId: number; text: string }): void {
-    this.eventEmitter.emit(NOTIFY_USER_EVENT, { chatId, text });
+    this.eventEmitter.emit(eventsMap.NOTIFY_USER_EVENT, { chatId, text });
   }
 
   handleError(error: unknown, errMsg: string): void {

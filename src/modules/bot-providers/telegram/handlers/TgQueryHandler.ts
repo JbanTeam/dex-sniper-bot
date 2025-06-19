@@ -1,7 +1,7 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
-import { IncomingQuery } from '@src/types/types';
+import { IncomingQuery, NetworkType, TokenAddressType } from '@src/types/types';
 import { strIsPositiveNumber } from '@libs/core/utils';
 import { RedisService } from '@modules/redis/redis.service';
 import { WalletService } from '@modules/wallet/wallet.service';
@@ -12,7 +12,7 @@ import { SubscriptionService } from '@modules/subscription/subscription.service'
 import { BaseQueryHandler } from '@src/common/bot-handlers/BaseQueryHandler';
 import { ReplicationService } from '@modules/replication/replication.service';
 import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
-import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
+import { isEtherAddress, isNetwork, isTokenAddressType, isValidRemoveQueryData } from '@src/types/typeGuards';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
@@ -83,7 +83,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
 
       isValidRemoveQueryData(network);
 
-      if (network === 'all') {
+      if (network === NetworkType.ALL) {
         await this.tokenService.removeToken({ chatId });
 
         reply = `Все токены успешно удалены 🔥🔥🔥`;
@@ -177,7 +177,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
 
       let reply: string;
 
-      if (tokenAddress === 'native') {
+      if (isTokenAddressType(tokenAddress) && tokenAddress === TokenAddressType.NATIVE) {
         const currency = this.constants.chains[network].tokenSymbol;
         await this.blockchainService.sendNative({
           userSession,

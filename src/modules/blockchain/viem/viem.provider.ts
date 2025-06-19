@@ -22,7 +22,7 @@ import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { BaseNetworkProvider } from '@src/common/network-provider/BaseNetworkProvider';
-import { MONITOR_DEX_EVENT, TRANSACTION_MAX_DEPTH } from '@src/constants';
+import { eventsMap, TRANSACTION_MAX_DEPTH } from '@src/constants';
 import { isEtherAddressArr, isNetwork } from '@src/types/typeGuards';
 import { Network, ViemNetwork } from '@src/types/types';
 import {
@@ -179,7 +179,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     return this.viemHelper.formatBalanceResponse(balanceInfo);
   }
 
-  @OnEvent(MONITOR_DEX_EVENT)
+  @OnEvent(eventsMap.MONITOR_DEX_EVENT)
   async monitorDex({ network }: { network: Network }): Promise<void> {
     this.unwatchCallbacks[network]();
     const client = this.clients.publicWebsocket[network];
@@ -338,15 +338,16 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     if (!subscriptions?.length) return;
 
     for (const subscription of subscriptions) {
+      const { chatId } = subscription.user;
       try {
-        if (tx.initiators.includes(subscription.user.chat_id)) continue;
+        if (tx.initiators.includes(chatId)) continue;
 
         if (tx.replicationDepth >= TRANSACTION_MAX_DEPTH) continue;
 
         await this.replicateTransaction({ subscription, tx });
       } catch (error) {
         if (error instanceof BotError) {
-          error.chatId = subscription.user.chat_id;
+          error.chatId = subscription.user.chatId;
         }
 
         if (error?.details?.includes('Out of gas')) {
@@ -429,9 +430,9 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
   }
 
   private async replicateTransaction({ subscription, tx }: ReplicateTransactionParams): Promise<void> {
-    const { chat_id } = subscription.user;
+    const { chatId } = subscription.user;
     const { network } = tx;
-    const userSession = await this.redisService.getUser(chat_id);
+    const userSession = await this.redisService.getUser(chatId);
     const wallet = subscription.user.wallets.find(wallet => wallet.network === network);
 
     if (!userSession.replications.length) return;
@@ -469,7 +470,7 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
       tx,
       account,
       walletClient,
-      chatId: chat_id,
+      chatId,
     });
 
     const formattedAmountIn = formatUnits(amountIn, inDecimals);
@@ -482,6 +483,6 @@ export class ViemProvider extends BaseNetworkProvider implements OnModuleInit, O
     reply += `<b>Потрачено:</b> ${formattedAmountIn} ${currencyIn}\n`;
     reply += `<b>Подписка ${exchange}:</b> <code>${subscription.address}</code>`;
 
-    this.viemHelper.notifyUser({ chatId: chat_id, text: reply });
+    this.viemHelper.notifyUser({ chatId, text: reply });
   }
 }

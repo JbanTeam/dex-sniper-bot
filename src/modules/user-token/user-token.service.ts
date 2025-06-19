@@ -7,7 +7,7 @@ import { UserToken } from './user-token.entity';
 import { BotError } from '@libs/core/errors';
 import { SessionUserToken } from '@src/types/types';
 import { TokenData } from '@modules/blockchain/types';
-import { MONITOR_DEX_EVENT } from '@src/constants';
+import { eventsMap } from '@src/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -50,7 +50,7 @@ export class UserTokenService {
       await this.createTestToken({ userSession, sessionToken, existsTokenId });
     }
 
-    if (pairAddresses) this.eventEmitter.emit(MONITOR_DEX_EVENT, { network });
+    if (pairAddresses) this.eventEmitter.emit(eventsMap.MONITOR_DEX_EVENT, { network });
 
     return this.prepareTokensReply(tokens);
   }

@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { IsEthereumAddress, IsEnum, IsString, IsNumber, ValidateNested } from 'class-validator';
 
-import { Network } from '@src/types/types';
+import { Address, Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
 import { Replication } from '@modules/replication/replication.entity';
 import { BaseEntity } from '@src/common/entities/base.entity';
@@ -10,7 +10,7 @@ import { BaseEntity } from '@src/common/entities/base.entity';
 export class UserToken extends BaseEntity {
   @Column()
   @IsEthereumAddress()
-  address: `0x${string}`;
+  address: Address;
 
   @Column({ enum: Network, default: Network.BSC })
   @IsEnum(Network)

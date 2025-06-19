@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { IsEnum, IsEthereumAddress, IsString } from 'class-validator';
 
-import { Network } from '@src/types/types';
+import { Address, Network } from '@src/types/types';
 import { User } from '@modules/user/user.entity';
 import { BaseEntity } from '@src/common/entities/base.entity';
 
@@ -13,11 +13,11 @@ export class Wallet extends BaseEntity {
 
   @Column()
   @IsEthereumAddress()
-  address: `0x${string}`;
+  address: Address;
 
-  @Column()
+  @Column({ name: 'encrypted_private_key' })
   @IsString()
-  encrypted_private_key: string;
+  encryptedPrivateKey: string;
 
   @ManyToOne(() => User, user => user.wallets, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })

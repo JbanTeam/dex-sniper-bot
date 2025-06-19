@@ -3,7 +3,6 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { HttpStatus, Injectable } from '@nestjs/common';
 
 import { BotError } from '@libs/core/errors';
-import { NOTIFY_USER_EVENT, tgCommands } from '@src/constants';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -11,6 +10,7 @@ import { TgCommandHandler } from './handlers/TgCommandHandler';
 import { TgQueryHandler } from './handlers/TgQueryHandler';
 import { TgMessageHandler } from './handlers/TgMessageHandler';
 import { Replication } from '@modules/replication/replication.entity';
+import { eventsMap, tgCommands } from '@src/constants';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { BotProviderInterface, IncomingMessage, IncomingQuery, SessionReplication } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
@@ -109,7 +109,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  @OnEvent(NOTIFY_USER_EVENT)
+  @OnEvent(eventsMap.NOTIFY_USER_EVENT)
   async notifyUser({ chatId, text }: { chatId: number; text: string }): Promise<void> {
     try {
       await this.sendMessage({ chatId, text });
