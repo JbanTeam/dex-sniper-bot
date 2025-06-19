@@ -1,12 +1,12 @@
 import { Repository } from 'typeorm';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Wallet } from './wallet.entity';
 import { Address } from '@src/types/types';
 import { CreateWalletParams } from './types';
 import { RedisService } from '@modules/redis/redis.service';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 
 @Injectable()
 export class WalletService {
@@ -36,8 +36,9 @@ export class WalletService {
 
   async getWallets(chatId: number): Promise<string> {
     const userSession = await this.redisService.getUser(chatId);
+
     if (!userSession.wallets.length) {
-      throw new BotError('You have no wallets', 'У вас нет кошельков', 404);
+      throw new BotError('You have no wallets', 'У вас нет кошельков', HttpStatus.NOT_FOUND);
     }
 
     let reply = `<u>Ваши кошельки:</u>\n`;

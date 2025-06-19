@@ -30,6 +30,19 @@ export type IncomingQuery = Omit<IncomingMessage, 'text'> & {
 
 export type Address = `0x${string}`;
 
+export enum TokenAddressType {
+  NATIVE = 'native',
+}
+
+export enum NetworkType {
+  ALL = 'all',
+}
+
+export enum BuySell {
+  BUY = 'buy',
+  SELL = 'sell',
+}
+
 export const ViemNetwork = {
   BSC: 'BSC',
   POLYGON: 'POLYGON',

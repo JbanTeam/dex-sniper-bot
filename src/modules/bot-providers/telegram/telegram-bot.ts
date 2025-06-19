@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { OnEvent } from '@nestjs/event-emitter';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
-import { BotError } from '@src/errors/BotError';
-import { tgCommands } from '@src/utils/constants';
+import { BotError } from '@libs/core/errors';
 import { RedisService } from '@modules/redis/redis.service';
 import { UserService } from '@modules/user/user.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
@@ -11,6 +10,7 @@ import { TgCommandHandler } from './handlers/TgCommandHandler';
 import { TgQueryHandler } from './handlers/TgQueryHandler';
 import { TgMessageHandler } from './handlers/TgMessageHandler';
 import { Replication } from '@modules/replication/replication.entity';
+import { eventsMap, tgCommands } from '@src/constants';
 import { isCallbackQueryUpdate, isMessageUpdate } from './types/typeGuards';
 import { BotProviderInterface, IncomingMessage, IncomingQuery, SessionReplication } from '@src/types/types';
 import { TgCallbackQuery, TgMessage, TgUpdateResponse, TgSendMsgParams, TgDeleteMsgParams } from './types/types';
@@ -100,6 +100,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Error while getting updates: ${message}`);
+
         if (this.stopped) return;
 
         console.log(`Retrying in ${this.retryDelay / 1000} seconds...`);
@@ -108,7 +109,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
     }
   }
 
-  @OnEvent('notifyUser')
+  @OnEvent(eventsMap.NOTIFY_USER_EVENT)
   async notifyUser({ chatId, text }: { chatId: number; text: string }): Promise<void> {
     try {
       await this.sendMessage({ chatId, text });
@@ -120,6 +121,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
   private async setCommands(): Promise<void> {
     const url = `${this.TG_URL}/setMyCommands`;
+
     const body = {
       commands: tgCommands,
       scope: { type: 'all_private_chats' },
@@ -130,7 +132,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       const response = await axios.post(url, body);
 
       if (!response.data.ok) {
-        throw new BotError('Failed to set commands', 'Не удалось установить команды', 400);
+        throw new BotError('Failed to set commands', 'Не удалось установить команды', HttpStatus.BAD_REQUEST);
       }
 
       console.log('Commands set successfully:', response.data);
@@ -142,6 +144,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
   private async handleIncomingMessage(message: IncomingMessage | IncomingQuery): Promise<void> {
     const response = await this.routeMessage(message);
+
     if ('data' in message) {
       await this.deleteMessage({ chatId: message.chatId, messageId: message.messageId });
     }
@@ -172,7 +175,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
 
       const { user, action } = await this.userService.getOrCreateUser(chatId);
 
-      if (!user) throw new BotError('User not found', 'Пользователь не найден', 404);
+      if (!user) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
       await this.redisService.addUser({
         chatId,
@@ -185,6 +188,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      console.log(error);
       console.error(`Error setting session: ${message}`);
     }
   }
@@ -218,7 +222,7 @@ export class TelegramBot implements BotProviderInterface<TgSendMsgParams, TgDele
         chatId: update.message?.chat.id || 0,
       };
     } else {
-      throw new BotError('Unknown update type', 'Ошибка при обработке обновления', 400);
+      throw new BotError('Unknown update type', 'Ошибка при обработке обновления', HttpStatus.BAD_REQUEST);
     }
   }
 

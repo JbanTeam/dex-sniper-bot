@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { INestApplication } from '@nestjs/common';
+import { HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { Repository } from 'typeorm';
@@ -21,7 +21,7 @@ import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';
 import { ViemHelperProvider } from '@modules/blockchain/viem/viem-helper.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { Network, Address, ViemNetwork } from '@src/types/types';
 import { ViemClientsType, UnwatchCallback } from '@modules/blockchain/viem/types';
 
@@ -240,7 +240,7 @@ describe('UserTokenService Integration', () => {
           address: mockTokenAddress,
           network,
         }),
-      ).rejects.toThrow(new BotError('Token already added', 'Токен уже добавлен', 400));
+      ).rejects.toThrow(new BotError('Token already added', 'Токен уже добавлен', HttpStatus.BAD_REQUEST));
     });
 
     it('should throw error when add more then 5 tokens', async () => {
@@ -254,7 +254,11 @@ describe('UserTokenService Integration', () => {
           network,
         }),
       ).rejects.toThrow(
-        new BotError('You can add only 5 tokens per network', 'Максимум можно добавить 5 токенов на одну сеть', 400),
+        new BotError(
+          'You can add only 5 tokens per network',
+          'Максимум можно добавить 5 токенов на одну сеть',
+          HttpStatus.BAD_REQUEST,
+        ),
       );
     });
   });
@@ -276,7 +280,7 @@ describe('UserTokenService Integration', () => {
 
     it('should throw error when no tokens found', async () => {
       await expect(userTokenService.getTokens(chatId)).rejects.toThrow(
-        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404),
+        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND),
       );
     });
   });
@@ -299,7 +303,7 @@ describe('UserTokenService Integration', () => {
 
     it('should throw error when token not found', async () => {
       await expect(userTokenService.removeToken({ chatId, address: mockTokenAddress })).rejects.toThrow(
-        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404),
+        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND),
       );
     });
   });
