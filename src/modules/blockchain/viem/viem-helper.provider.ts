@@ -1,7 +1,7 @@
 import { anvil } from 'viem/chains';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { privateKeyToAccount } from 'viem/accounts';
-import { forwardRef, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { forwardRef, HttpStatus, Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   Account,
   Chain,
@@ -18,16 +18,17 @@ import {
 
 import { isSwapLog } from './typeGuards';
 import { AnvilProvider } from './anvil/anvil.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { isNetwork } from '@src/types/typeGuards';
-import { decryptPrivateKey } from '@src/utils/crypto';
+import { decryptPrivateKey } from '@libs/core/utils';
 import { Wallet } from '@modules/wallet/wallet.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@src/utils/constants';
 import { abi as routerAbi } from '@src/contract-artifacts/UniswapV2Router02.json';
 import { BalanceInfo, PairAddresses, Transaction } from '../types';
 import { Address, Network, SessionReplication, ViemNetwork } from '@src/types/types';
+import { EMPTY_PAIR_ADDRESS, eventsMap } from '@src/constants';
+import { parsedFactoryAbi, parsedPairAbi, parsedRouterAbi } from '@libs/abi';
 import {
   AllowanceParams,
   ApproveParams,
@@ -154,15 +155,18 @@ export class ViemHelperProvider implements OnModuleInit {
 
   getSharedVars(network: Network): SharedVarsReturnType {
     const { chains, notProd, ANVIL_RPC_URL } = this.constants;
+
     const chain = notProd ? anvil : chains[network].chain;
     const rpcUrl = notProd ? ANVIL_RPC_URL : chains[network].rpcUrl;
     const nativeToken = notProd ? this.cachedContracts.nativeToken : chains[network].nativeToken;
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
+
     return { chain, rpcUrl, nativeToken, routerAddress };
   }
 
   formatBalanceResponse(balanceInfo: BalanceInfo): string {
     const { address, network, nativeBalance, tokenBalances } = balanceInfo;
+
     let balanceReply = `<b>Адрес:</b> <code>${address}</code>\n`;
     balanceReply += `<b>Сеть:</b> ${network}\n`;
     balanceReply += `<b>${nativeBalance.symbol}:</b> ${nativeBalance.amount}\n`;
@@ -176,12 +180,15 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async parseEventLog(log: Log, network: Network): Promise<Transaction | null> {
     if (!isSwapLog(log)) return null;
+
     let tokenIn: Address;
     let tokenOut: Address;
+
     const { chains, notProd } = this.constants;
     const { address, eventName } = log;
     const { sender, to, amount0In, amount1In, amount0Out, amount1Out } = log.args;
     const prefix = notProd ? 'testPair' : 'pair';
+
     const pair = await this.redisService.getPair({ prefix, pairAddress: address, network });
     const routerAddress = notProd ? this.cachedContracts.routerAddress : chains[network].routerAddress;
 
@@ -196,8 +203,10 @@ export class ViemHelperProvider implements OnModuleInit {
       tokenIn = pair.token1;
       tokenOut = pair.token0;
     }
+
     const amountIn = amount0In + amount1In;
     const amountOut = amount0Out + amount1Out;
+
     const parsedLog: Transaction = {
       eventName,
       pairAddress: address.toLowerCase() as Address,
@@ -225,6 +234,7 @@ export class ViemHelperProvider implements OnModuleInit {
     subscriptionAddress,
   }: MatchedReplicationParams): SessionReplication | undefined {
     const { tokenIn, tokenOut, amountIn, amountOut, network } = tx;
+
     const nativeToken = this.getSharedVars(network).nativeToken;
     const isInNative = tokenIn === nativeToken;
     const isOutNative = tokenOut === nativeToken;
@@ -270,7 +280,7 @@ export class ViemHelperProvider implements OnModuleInit {
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`Tokens not sent ❌`, `🚫 Ошибка отправки токенов`, 400);
+      throw new BotError(`Tokens not sent ❌`, `🚫 Ошибка отправки токенов`, HttpStatus.BAD_REQUEST);
     }
 
     console.log('✅ Токены отправлены', receipt);
@@ -294,7 +304,7 @@ export class ViemHelperProvider implements OnModuleInit {
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
     if (receipt.status !== 'success') {
-      throw new BotError(`${currency} not sent ❌`, `🚫 Ошибка отправки ${currency}`, 400);
+      throw new BotError(`${currency} not sent ❌`, `🚫 Ошибка отправки ${currency}`, HttpStatus.BAD_REQUEST);
     }
 
     console.log(`✅ ${currency} отправлены`, receipt);
@@ -311,6 +321,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async approve({ tokenAddress, walletClient, tx, account }: ApproveParams): Promise<void> {
     const { network, routerAddress, amountIn } = tx;
+
     await walletClient.writeContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -323,6 +334,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
   async allowance({ routerAddress, tokenAddress, walletAddress, network }: AllowanceParams): Promise<bigint> {
     const publicClient = this.clients.public[network];
+
     return publicClient.readContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -357,6 +369,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
     const publicClient = this.clients.public[tx.network];
     const receipt = await publicClient.getTransactionReceipt({ hash });
+
     const parsedLogs = parseEventLogs({
       abi: parsedPairAbi,
       eventName: 'Swap',
@@ -368,6 +381,7 @@ export class ViemHelperProvider implements OnModuleInit {
 
     for (const log of parsedLogs) {
       if (!isSwapLog(log)) continue;
+
       if (log.args.amount0In > 0) {
         amountIn = log.args.amount0In;
         amountOut = log.args.amount1Out;
@@ -376,6 +390,7 @@ export class ViemHelperProvider implements OnModuleInit {
         amountOut = log.args.amount0Out;
       }
     }
+
     return { amountIn, amountOut };
   }
 
@@ -387,8 +402,8 @@ export class ViemHelperProvider implements OnModuleInit {
       args: [nativeToken, tokenAddress],
     });
 
-    if (pairAddress === '0x0000000000000000000000000000000000000000') {
-      throw new BotError('Pair does not exist', 'Пара не существует', 400);
+    if (pairAddress === EMPTY_PAIR_ADDRESS) {
+      throw new BotError('Pair does not exist', 'Пара не существует', HttpStatus.BAD_REQUEST);
     }
 
     const [token0, token1] = await Promise.all([
@@ -422,7 +437,7 @@ export class ViemHelperProvider implements OnModuleInit {
   }
 
   notifyUser({ chatId, text }: { chatId: number; text: string }): void {
-    this.eventEmitter.emit('notifyUser', { chatId, text });
+    this.eventEmitter.emit(eventsMap.NOTIFY_USER_EVENT, { chatId, text });
   }
 
   handleError(error: unknown, errMsg: string): void {

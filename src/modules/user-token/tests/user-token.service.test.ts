@@ -8,9 +8,10 @@ import { User } from '@modules/user/user.entity';
 import { RedisService } from '@modules/redis/redis.service';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ChainsType, SessionUser, SessionUserToken } from '@src/types/types';
+import { HttpStatus } from '@nestjs/common';
 
 const mockUserToken = {
   id: 1,
@@ -141,7 +142,7 @@ describe('UserTokenService', () => {
           address: '0xTokenAddress',
           network: 'BSC',
         }),
-      ).rejects.toThrow(new BotError('Token already added', 'Токен уже добавлен', 400));
+      ).rejects.toThrow(new BotError('Token already added', 'Токен уже добавлен', HttpStatus.BAD_REQUEST));
     });
 
     it('should throw error when max tokens per network reached', async () => {
@@ -157,7 +158,11 @@ describe('UserTokenService', () => {
           network: 'BSC',
         }),
       ).rejects.toThrow(
-        new BotError('You can add only 5 tokens per network', 'Максимум можно добавить 5 токенов на одну сеть', 400),
+        new BotError(
+          'You can add only 5 tokens per network',
+          'Максимум можно добавить 5 токенов на одну сеть',
+          HttpStatus.BAD_REQUEST,
+        ),
       );
     });
   });
@@ -184,7 +189,7 @@ describe('UserTokenService', () => {
       mockRedisService.getUser = jest.fn().mockResolvedValue(mockUserSession);
 
       await expect(userTokenService.getTokens(chatId)).rejects.toThrow(
-        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404),
+        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND),
       );
     });
   });
@@ -247,7 +252,9 @@ describe('UserTokenService', () => {
           chatId,
           address: '0xTokenAddress',
         }),
-      ).rejects.toThrow(new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', 404));
+      ).rejects.toThrow(
+        new BotError('You have no saved tokens', 'У вас нет сохраненных токенов', HttpStatus.NOT_FOUND),
+      );
     });
 
     it('should throw error when token not found by address', async () => {
@@ -263,7 +270,7 @@ describe('UserTokenService', () => {
           chatId,
           address: '0xTokenAddress',
         }),
-      ).rejects.toThrow(new BotError('Token not found', 'Токен не найден', 404));
+      ).rejects.toThrow(new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND));
     });
 
     it('should throw error when tokens not found in network', async () => {
@@ -279,7 +286,9 @@ describe('UserTokenService', () => {
           chatId,
           network: 'BSC',
         }),
-      ).rejects.toThrow(new BotError('Tokens not found in this network', 'Токены не найдены в указанной сети', 404));
+      ).rejects.toThrow(
+        new BotError('Tokens not found in this network', 'Токены не найдены в указанной сети', HttpStatus.NOT_FOUND),
+      );
     });
 
     it('should throw error when tokens not deleted', async () => {
@@ -297,7 +306,7 @@ describe('UserTokenService', () => {
           chatId,
           address: '0xTokenAddress',
         }),
-      ).rejects.toThrow(new BotError('Tokens not deleted', 'Токены не удалены', 400));
+      ).rejects.toThrow(new BotError('Tokens not deleted', 'Токены не удалены', HttpStatus.BAD_REQUEST));
     });
   });
 });

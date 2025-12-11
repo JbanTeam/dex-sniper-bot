@@ -1,6 +1,11 @@
 import Redis from 'ioredis';
-import { Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 
+import { BotError } from '@libs/core/errors';
+import { REGEXP_NUMBER } from '@src/constants';
+import { isEtherAddress } from '@src/types/typeGuards';
+import { CachedContractsType } from '@modules/blockchain/viem/types';
+import { ConstantsProvider } from '@modules/constants/constants.provider';
 import {
   Network,
   SessionUser,
@@ -24,10 +29,6 @@ import {
   TxContextType,
   FilterTokensReturnType,
 } from './types';
-import { BotError } from '@src/errors/BotError';
-import { ConstantsProvider } from '@modules/constants/constants.provider';
-import { CachedContractsType } from '@modules/blockchain/viem/types';
-import { isEtherAddress } from '@src/types/typeGuards';
 
 @Injectable()
 export class RedisService {
@@ -160,7 +161,7 @@ export class RedisService {
 
   async getUser(chatId: number): Promise<SessionUser> {
     const userData = await this.redisClient.hgetall(`user:${chatId}`);
-    if (!userData) throw new BotError('User not found', 'Пользователь не найден', 404);
+    if (!userData) throw new BotError('User not found', 'Пользователь не найден', HttpStatus.NOT_FOUND);
 
     return this.parseData<SessionUser>(userData);
   }
@@ -181,7 +182,7 @@ export class RedisService {
   async getTempReplication(chatId: number): Promise<TempReplication> {
     const tempReplicationData = await this.redisClient.hget(`user:${chatId}`, 'tempReplication');
     if (!tempReplicationData)
-      throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', 404);
+      throw new BotError('Error getting temp replication', 'Ошибка установления повтора сделок', HttpStatus.NOT_FOUND);
     return this.parseData<TempReplication>(JSON.parse(tempReplicationData));
   }
 
@@ -369,7 +370,7 @@ export class RedisService {
     const parsedObject: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(data)) {
-      if (/^-?\d+$/.test(value)) {
+      if (REGEXP_NUMBER.test(value)) {
         parsedObject[key] = Number(value);
       } else if (value === 'true' || value === 'false') {
         parsedObject[key] = value === 'true';

@@ -1,18 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
+import { IncomingQuery, NetworkType, TokenAddressType } from '@src/types/types';
+import { strIsPositiveNumber } from '@libs/core/utils';
 import { RedisService } from '@modules/redis/redis.service';
-import { BlockchainService } from '@modules/blockchain/blockchain.service';
-import { SubscriptionService } from '@modules/subscription/subscription.service';
 import { WalletService } from '@modules/wallet/wallet.service';
-import { strIsPositiveNumber } from '@src/utils/utils';
-import { IncomingQuery } from '@src/types/types';
-import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
-import { isEtherAddress, isNetwork, isValidRemoveQueryData } from '@src/types/typeGuards';
-import { BaseQueryHandler } from '@modules/bot-providers/handlers/BaseQueryHandler';
 import { ConstantsProvider } from '@modules/constants/constants.provider';
 import { UserTokenService } from '@modules/user-token/user-token.service';
+import { BlockchainService } from '@modules/blockchain/blockchain.service';
+import { SubscriptionService } from '@modules/subscription/subscription.service';
+import { BaseQueryHandler } from '@src/common/bot-handlers/BaseQueryHandler';
 import { ReplicationService } from '@modules/replication/replication.service';
+import { TgCommandReturnType, TgQueryFunction, TgSendMessageOptions } from '../types/types';
+import { isEtherAddress, isNetwork, isTokenAddressType, isValidRemoveQueryData } from '@src/types/typeGuards';
 
 @Injectable()
 export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandReturnType> {
@@ -55,10 +55,12 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const [, network] = query.data.split('-');
       const userSession = await this.redisService.getUser(query.chatId);
 
-      if (!userSession.tempToken) throw new BotError('Token not found', 'Токен не найден', 404);
+      if (!userSession.tempToken) throw new BotError('Token not found', 'Токен не найден', HttpStatus.NOT_FOUND);
+
       isEtherAddress(userSession.tempToken);
 
-      if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
+      if (!network) throw new BotError('Network not found', 'Сеть не найдена', HttpStatus.NOT_FOUND);
+
       isNetwork(network);
 
       const reply = await this.tokenService.addToken({
@@ -81,7 +83,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
 
       isValidRemoveQueryData(network);
 
-      if (network === 'all') {
+      if (network === NetworkType.ALL) {
         await this.tokenService.removeToken({ chatId });
 
         reply = `Все токены успешно удалены 🔥🔥🔥`;
@@ -103,7 +105,7 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const wallets = await this.redisService.getWallets(query.chatId);
       const wallet = wallets?.find(wallet => wallet.id === walletId);
 
-      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
 
       const balance = await this.blockchainService.getBalance({
         chatId: query.chatId,
@@ -120,13 +122,14 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   subscribeCb: TgQueryFunction = async query => {
     try {
       const [, network] = query.data.split('-');
-
       const tempWallet = await this.redisService.getTempWallet(query.chatId);
 
-      if (!tempWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+      if (!tempWallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
+
       isEtherAddress(tempWallet);
 
-      if (!network) throw new BotError('Network not found', 'Сеть не найдена', 404);
+      if (!network) throw new BotError('Network not found', 'Сеть не найдена', HttpStatus.NOT_FOUND);
+
       isNetwork(network);
 
       await this.subscriptionService.subscribeToWallet({
@@ -146,24 +149,35 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       const [, network] = query.data.split('-');
       const tempSendTokens = await this.redisService.getTempSendTokens(query.chatId);
 
-      if (!tempSendTokens) throw new BotError('Error sending tokens', 'Ошибка отправки токенов', 400);
+      if (!tempSendTokens) {
+        throw new BotError('Error sending tokens', 'Ошибка отправки токенов', HttpStatus.BAD_REQUEST);
+      }
+
       const [tokenAddress, amount, recipientAddress] = tempSendTokens.split(':');
 
       isNetwork(network);
       isEtherAddress(recipientAddress);
+
       if (!strIsPositiveNumber(amount)) {
-        throw new BotError('Enter correct amount of tokens', 'Введите корректное количество токенов', 400);
+        throw new BotError(
+          'Enter correct amount of tokens',
+          'Введите корректное количество токенов',
+          HttpStatus.BAD_REQUEST,
+        );
       }
 
       const userSession = await this.redisService.getUser(query.chatId);
       const wallet = userSession.wallets.find(wallet => wallet.network === network);
-      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+
+      if (!wallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
 
       const fullWallet = await this.walletService.findByAddress(wallet.address);
-      if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', 404);
+
+      if (!fullWallet) throw new BotError('Wallet not found', 'Кошелек не найден', HttpStatus.NOT_FOUND);
 
       let reply: string;
-      if (tokenAddress === 'native') {
+
+      if (isTokenAddressType(tokenAddress) && tokenAddress === TokenAddressType.NATIVE) {
         const currency = this.constants.chains[network].tokenSymbol;
         await this.blockchainService.sendNative({
           userSession,
@@ -176,8 +190,9 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
       } else {
         isEtherAddress(tokenAddress);
         const token = userSession.tokens.find(token => token.address === tokenAddress);
+
         if (!token) {
-          throw new BotError('Token not found', 'Токен не найден в списке добавленных', 404);
+          throw new BotError('Token not found', 'Токен не найден в списке добавленных', HttpStatus.NOT_FOUND);
         }
 
         await this.blockchainService.sendTokens({
@@ -201,7 +216,10 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
     try {
       const [, tokenId] = query.data.split('-');
       const tempReplication = await this.redisService.getTempReplication(query.chatId);
-      if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
+
+      if (!tempReplication) {
+        throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
+      }
 
       tempReplication.tokenId = +tokenId;
       const reply = await this.replicationService.createOrUpdateReplication(tempReplication);
@@ -225,13 +243,18 @@ export class TgQueryHandler extends BaseQueryHandler<IncomingQuery, TgCommandRet
   private replicateSetSubscription: TgQueryFunction = async query => {
     try {
       const [, subscriptionId, network] = query.data.split('-');
+
       isNetwork(network);
 
       const tempReplication = await this.redisService.getTempReplication(query.chatId);
-      if (!tempReplication) throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', 400);
+
+      if (!tempReplication) {
+        throw new BotError('Error setting replication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST);
+      }
 
       tempReplication.subscriptionId = +subscriptionId;
       tempReplication.network = network;
+
       await this.redisService.setUserField(query.chatId, 'tempReplication', JSON.stringify(tempReplication));
 
       const tokens = await this.redisService.getTokens(query.chatId, 'tokens');

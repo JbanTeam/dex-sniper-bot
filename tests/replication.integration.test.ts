@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { INestApplication } from '@nestjs/common';
+import { HttpStatus, INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigModule } from '@nestjs/config';
 import { Repository } from 'typeorm';
@@ -24,7 +24,7 @@ import { BlockchainModule } from '@modules/blockchain/blockchain.module';
 import { ViemProvider } from '@modules/blockchain/viem/viem.provider';
 import { AnvilProvider } from '@modules/blockchain/viem/anvil/anvil.provider';
 import { ViemHelperProvider } from '@modules/blockchain/viem/viem-helper.provider';
-import { BotError } from '@src/errors/BotError';
+import { BotError } from '@libs/core/errors';
 import { Network, Address, TempReplication, ViemNetwork } from '@src/types/types';
 import { ViemClientsType, UnwatchCallback } from '@modules/blockchain/viem/types';
 import { PublicClient } from 'viem';
@@ -237,7 +237,7 @@ describe('ReplicationService Integration', () => {
 
     it('should throw BotError if no replications are found', async () => {
       await expect(replicationService.getReplications(chatId)).rejects.toThrow(
-        new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', 404),
+        new BotError('You have no replicatons', 'Вы не устанавливали повтор сделок', HttpStatus.NOT_FOUND),
       );
     });
   });
@@ -364,7 +364,7 @@ describe('ReplicationService Integration', () => {
         tokenId: token.id,
       };
       await expect(replicationService.createOrUpdateReplication(tempReplication)).rejects.toThrow(
-        new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', 400),
+        new BotError('Invalid data in tempReplication', 'Не удалось установить повтор сделок', HttpStatus.BAD_REQUEST),
       );
     });
 

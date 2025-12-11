@@ -6,7 +6,7 @@ import {
   GetBalanceParams,
   SendNativeParams,
   SendTokensParams,
-} from './types';
+} from '@modules/blockchain/types';
 
 export abstract class BaseNetworkProvider {
   abstract createWallet(network: Network): Promise<CreateWalletReturnType>;
